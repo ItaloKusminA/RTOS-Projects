@@ -22,4 +22,4 @@ The `producer` function is initialized with a generic number of producer threads
 
 The `consumer` function is initialized with a generic number of consumer threads, which can be chosen in the defines at the beginning of the code. It takes a random time in the range from 1 to 100 ticks to consume an item, increasing the `empty` semaphore value and decreasing the buffer and `full` semaphore values. When the buffer is accessed, the mutex is locked.
 
-In this implementation, the producers have priorities alternated as (1, 3, 5, ...) and the consumers as (2, 4, 6, ...) to alternate the priority between them, allowing the scheduler to change which one will be scheduled.
+In this implementation, the producers have greater priority than the consumers.
