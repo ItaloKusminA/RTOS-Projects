@@ -195,10 +195,12 @@ void OSThread_start(
 }
 
 void semaphore_init(semaphore_t* semaphore, uint8_t starting_value){
+	Q_ASSERT(semaphore);
 	semaphore->current_value = starting_value;
 }
 
 void semaphore_wait(semaphore_t* semaphore){
+	Q_ASSERT(semaphore);
 	__disable_irq();
 	while (semaphore->current_value == 0){
 		OS_yield(1);
@@ -209,6 +211,7 @@ void semaphore_wait(semaphore_t* semaphore){
 }
 
 void semaphore_post(semaphore_t* semaphore){
+	Q_ASSERT(semaphore);
 	__disable_irq();
 	semaphore->current_value++;
 	__enable_irq();
