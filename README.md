@@ -3,7 +3,7 @@
 ## Student Information
 
 Name: Italo Miranda Kusmin Alves  
-Matriculation: 22101930
+Enrollment Number: 22101930
 
 ## Semaphore Implementation
 The implementation of semaphores was done with a structure containing three functions:
