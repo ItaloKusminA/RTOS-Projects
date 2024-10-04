@@ -12,6 +12,9 @@ The implementation of semaphores was done with a structure containing three func
 - The second function is `semaphore_wait`, which verifies if the semaphore's current value is equal to zero. If it is, a yield function is implemented to allow the OS to schedule the next thread until the semaphore's current value changes to a value greater than zero. Otherwise, the semaphore's current value is decreased.
 - The third function is `semaphore_post`, which increases the semaphore's current value.
 
+All three functions call the macro `Q_ASSERT()` to verify if the received parameter is valid. If it is not, the function Q_onASSERT() is called to reinitializate the system.
+
+
 ## Producer and Consumer Implementation
 The producer and consumer implementation is based on "Modern Operating Systems" by Andrew S. Tanenbaum. It involves creating three semaphores: `empty`, `full`, and `mutex`, and two functions: `producer` and `consumer`.
 - The `full` semaphore stores the number of occupied spaces in the buffer. When an item is produced, this semaphore is increased, and the `empty` semaphore is decreased. It should be initialized to 0 if the buffer is empty.
