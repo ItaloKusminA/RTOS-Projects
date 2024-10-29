@@ -1,10 +1,13 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Projects developed during the RTOS Discipline
 ## Project 1
 Producer and consumer implementation using semaphores
 ## Project 2
 EDF Scheduler implementation with periodic tasks 
 =======
+=======
+>>>>>>> 00acecc (Changes in the names and prioritys)
 # Producer and Consumer Implementation Using Semaphores on MirOS
 
 ## Student Information
@@ -29,5 +32,10 @@ The `producer` function is initialized with a generic number of producer threads
 
 The `consumer` function is initialized with a generic number of consumer threads, which can be chosen in the defines at the beginning of the code. It takes a random time in the range from 1 to 100 ticks to consume an item, increasing the `empty` semaphore value and decreasing the buffer and `full` semaphore values. When the buffer is accessed, the mutex is locked.
 
+<<<<<<< HEAD
 In this implementation, the producers have greater priority than the consumers.
 >>>>>>> 3cf8092 (EDF scheduler)
+=======
+In this implementation, the producers and consumers have alternating priorities to ensure they are always scheduled alternately. Producers have odd priorities (1, 3, 5, ...) and consumers have even priorities (2, 4, 6, ...).
+
+>>>>>>> 00acecc (Changes in the names and prioritys)

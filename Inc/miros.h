@@ -32,11 +32,19 @@
 #ifndef MIROS_H
 #define MIROS_H
 
+
+
 /* Thread Control Block (TCB) */
-typedef struct {
+typedef struct OSThread {
     void *sp; /* stack pointer */
     uint32_t timeout; /* timeout delay down-counter */
-    uint8_t prio; /* thread priority */
+    uint32_t ABSdeadline; /* thread priority */
+    uint32_t ABSperiod;
+    uint32_t ABScomputation_time;
+    uint32_t deadline; /* thread priority */
+    uint32_t period;
+    uint32_t computation_time;
+    uint32_t index;
     /* ... other attributes associated with a thread */
 } OSThread;
 
@@ -44,7 +52,7 @@ typedef struct {
 
 typedef void (*OSThreadHandler)();
 
-void OS_init(void *stkSto, uint32_t stkSize);
+void OS_init(void);
 
 /* callback to handle the idle condition */
 void OS_onIdle(void);
@@ -66,7 +74,9 @@ void OS_onStartup(void);
 
 void OSThread_start(
     OSThread *me,
-    uint8_t prio, /* thread priority */
+    uint32_t absolute_deadline, /* task deadline */
+	uint32_t absolute_period,
+	uint32_t absolute_computation_time,
     OSThreadHandler threadHandler,
     void *stkSto, uint32_t stkSize);
 

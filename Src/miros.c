@@ -30,50 +30,55 @@
 * https://github.com/QuantumLeaps/MiROS
 ****************************************************************************/
 #include <stdint.h>
+#include <stdbool.h>
 #include "miros.h"
 #include "qassert.h"
 #include "stm32f1xx.h"
-
+#include "stm32f1xx_hal.h"
 Q_DEFINE_THIS_FILE
+
+#define MAX_THREADS 32
 
 OSThread * volatile OS_curr; /* pointer to the current thread */
 OSThread * volatile OS_next; /* pointer to the next thread to run */
 
-OSThread *OS_thread[32 + 1]; /* array of threads started so far */
-uint32_t OS_readySet; /* bitmask of threads that are ready to run */
-uint32_t OS_delayedSet; /* bitmask of threads that are delayed */
-
-#define LOG2(x) (32U - __builtin_clz(x))
+OSThread *OS_thread[MAX_THREADS + 1]; /* array of threads started so far */
+uint8_t OS_readyIndex[MAX_THREADS + 1]; /* bitmask of threads that are ready to run */
+uint8_t OS_threadIndex = 0;
+uint8_t sched_index;
 
 OSThread idleThread;
+uint32_t stack_idleThread[40];
+
 void main_idleThread() {
     while (1) {
         OS_onIdle();
     }
 }
 
-void OS_init(void *stkSto, uint32_t stkSize) {
+void OS_init() {
     /* set the PendSV interrupt priority to the lowest level 0xFF */
     *(uint32_t volatile *)0xE000ED20 |= (0xFFU << 16);
 
     /* start idleThread thread */
     OSThread_start(&idleThread,
-                   0U, /* idle thread priority */
+                   UINT32_MAX,
+				   UINT32_MAX,
+				   0U,
                    &main_idleThread,
-                   stkSto, stkSize);
+				   stack_idleThread, (sizeof(stack_idleThread)));
 }
 
 void OS_sched(void) {
-    /* choose the next thread to execute... */
-    OSThread *next;
-    if (OS_readySet == 0U) { /* idle condition? */
-        next = OS_thread[0]; /* the idle thread */
-    }
-    else {
-        next = OS_thread[LOG2(OS_readySet)];
-        Q_ASSERT(next != (OSThread *)0);
-    }
+	OSThread *next;
 
+	    if (sched_index == 0U) { /* idle condition? */
+	        next = OS_thread[0]; /* the idle thread */
+	    }
+	    else {
+	        next = OS_thread[sched_index];
+	        Q_ASSERT(next != (OSThread *)0);
+	    }
     /* trigger PendSV, if needed */
     if (next != OS_curr) {
         OS_next = next;
@@ -92,8 +97,22 @@ void OS_sched(void) {
 
 void OS_run(void) {
     /* callback to configure and start interrupts */
+	bool idleVerification = false;
+	int earliest_deadline_index = 0;
+	for(int i = 1; i < OS_threadIndex+1; i++){
+		if(OS_thread[i]){
+			if(OS_readyIndex[i] == 0){
+			}
+			else{
+				if (OS_thread[i]->deadline < OS_thread[earliest_deadline_index]->deadline) {
+					earliest_deadline_index = i;
+				}
+				idleVerification = true;
+			}
+		}
+	}
+	if(!idleVerification) sched_index = 0;
     OS_onStartup();
-
     __disable_irq();
     OS_sched();
     __enable_irq();
@@ -103,33 +122,44 @@ void OS_run(void) {
 }
 
 void OS_tick(void) {
-    uint32_t workingSet = OS_delayedSet;
-    while (workingSet != 0U) {
-        OSThread *t = OS_thread[LOG2(workingSet)];
-        uint32_t bit;
-        Q_ASSERT((t != (OSThread *)0) && (t->timeout != 0U));
-
-        bit = (1U << (t->prio - 1U));
-        --t->timeout;
-        if (t->timeout == 0U) {
-            OS_readySet   |= bit;  /* insert to set */
-            OS_delayedSet &= ~bit; /* remove from set */
+    bool idleVerification = false;
+    uint8_t earliest_deadline_index = 0;
+    for (int i = 1; i < OS_threadIndex+1; i++) {
+        if (OS_thread[i]) {
+        	if (OS_readyIndex[i] == 0){
+				if (OS_thread[i]->timeout == 0) {
+					OS_readyIndex[i] = 1;
+					OS_thread[i]->deadline = OS_thread[i]->ABSdeadline;
+					OS_thread[i]->computation_time = OS_thread[i]->ABScomputation_time;
+					OS_thread[i]->period = OS_thread[i]->ABSperiod;
+				}
+				OS_thread[i]->timeout--;
+        	} else {
+        		idleVerification = true;
+        		if (OS_thread[i]->deadline < OS_thread[earliest_deadline_index]->deadline) {
+        			earliest_deadline_index = i;
+        		}
+        		if(OS_thread[i]->computation_time == 0){
+        			OS_readyIndex[i] = 0;
+        			OS_thread[i]->timeout = OS_thread[i]->period;
+        		}
+        		OS_thread[i]->period--;
+        	}
         }
-        workingSet &= ~bit; /* remove from working set */
+        OS_thread[i]->deadline--;
     }
+    OS_thread[earliest_deadline_index]->computation_time--;
+    sched_index = earliest_deadline_index;
+    if (!idleVerification) sched_index = 0;
 }
 
 void OS_delay(uint32_t ticks) {
-    uint32_t bit;
     __asm volatile ("cpsid i");
 
     /* never call OS_delay from the idleThread */
     Q_REQUIRE(OS_curr != OS_thread[0]);
-
     OS_curr->timeout = ticks;
-    bit = (1U << (OS_curr->prio - 1U));
-    OS_readySet &= ~bit;
-    OS_delayedSet |= bit;
+    OS_readyIndex[OS_curr->index] = 0;
     OS_sched();
     __asm volatile ("cpsie i");
 }
@@ -140,7 +170,9 @@ void OS_yield(){
 
 void OSThread_start(
     OSThread *me,
-    uint8_t prio, /* thread priority */
+    uint32_t absolute_deadline, /* task deadline */
+	uint32_t absolute_period,
+	uint32_t absolute_computation_time,
     OSThreadHandler threadHandler,
     void *stkSto, uint32_t stkSize)
 {
@@ -150,11 +182,6 @@ void OSThread_start(
     uint32_t *sp = (uint32_t *)((((uint32_t)stkSto + stkSize) / 8) * 8);
     uint32_t *stk_limit;
 
-    /* priority must be in ragne
-    * and the priority level must be unused
-    */
-    Q_REQUIRE((prio < Q_DIM(OS_thread))
-              && (OS_thread[prio] == (OSThread *)0));
 
     *(--sp) = (1U << 24);  /* xPSR */
     *(--sp) = (uint32_t)threadHandler; /* PC */
@@ -176,6 +203,16 @@ void OSThread_start(
 
     /* save the top of the stack in the thread's attibute */
     me->sp = sp;
+    me->ABScomputation_time = absolute_computation_time;
+    me->computation_time = absolute_computation_time;
+    me->ABSdeadline = absolute_deadline;
+    me->deadline = absolute_deadline;
+    me->ABSperiod = absolute_period;
+    me->period = absolute_period;
+    me->index = OS_threadIndex;
+    OS_thread[OS_threadIndex] = me;
+    OS_readyIndex[OS_threadIndex] = 1;
+    OS_threadIndex++;
 
     /* round up the bottom of the stack to the 8-byte boundary */
     stk_limit = (uint32_t *)(((((uint32_t)stkSto - 1U) / 8) + 1U) * 8);
@@ -184,21 +221,15 @@ void OSThread_start(
     for (sp = sp - 1U; sp >= stk_limit; --sp) {
         *sp = 0xDEADBEEFU;
     }
-
-    /* register the thread with the OS */
-    OS_thread[prio] = me;
-    me->prio = prio;
-    /* make the thread ready to run */
-    if (prio > 0U) {
-        OS_readySet |= (1U << (prio - 1U));
-    }
 }
 
 void semaphore_init(semaphore_t* semaphore, uint8_t starting_value){
+	Q_ASSERT(semaphore);
 	semaphore->current_value = starting_value;
 }
 
 void semaphore_wait(semaphore_t* semaphore){
+	Q_ASSERT(semaphore);
 	__disable_irq();
 	while (semaphore->current_value == 0){
 		OS_yield(1);
@@ -209,6 +240,7 @@ void semaphore_wait(semaphore_t* semaphore){
 }
 
 void semaphore_post(semaphore_t* semaphore){
+	Q_ASSERT(semaphore);
 	__disable_irq();
 	semaphore->current_value++;
 	__enable_irq();
