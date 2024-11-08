@@ -24,7 +24,7 @@ The periodic task implementation aims to abstract an injection system in an Engi
 
 To analyze the schedulability of these tasks, the computation time of each one was measured over 5 minutes, and the average computation time was calculated. To measure the time, `HAL_GetTick` was used to get the tick at the beginning and end of each task, and the average was updated.
 
-## Tasks parameters table
+## Example Table
 
 | Task             | Computation Time | Deadline | Period |
 |------------------|------------------|----------|--------|
@@ -33,11 +33,11 @@ To analyze the schedulability of these tasks, the computation time of each one w
 | TaskDiagnostics  | 0.151287213      | 500      | 500    |
 
 ## Schedulability Analysis
-To determine if the system is schedulable, we use the following formula for the utilization factor \(U\):
+To determine if the system is schedulable, we use the following formula for the utilization factor \( U \):
 
 \[ U = \sum_{i=1}^{n} \frac{C_i}{T_i} \]
 
-where \(C_i\) is the computation time and \(T_i\) is the period for each task \(i\).
+where \( C_i \) is the computation time and \( T_i \) is the period for each task \( i \).
 
 Calculating the utilization factor for the given tasks:
 
@@ -47,6 +47,4 @@ Calculating the utilization factor for the given tasks:
 
 \[ U = 0.008631934656 \]
 
-The utilization factor \(U = 0.008631934656\) is well below 1, indicating that the tasks are schedulable under the given deadlines and periods.
-
-  
+The utilization factor \( U = 0.008631934656 \) is well below 1, indicating that the tasks are schedulable under the given deadlines and periods.
