@@ -27,7 +27,8 @@ volatile int crankshaftPosition;
 volatile int massAirFlow;
 volatile int engineTemperature;
 volatile int oxygenSensor;
-
+volatile int iteration = 0;
+float executionTimeAverage;
 
 int readCrankshaftPosition() {
     return rand() % 360;
@@ -78,30 +79,45 @@ void detectFaults() {
 }
 
 void TaskSensoriamento() {
-	while(1){
-    	crankshaftPosition = readCrankshaftPosition();
-        massAirFlow = readMassAirFlow();
-        engineTemperature = readEngineTemperature();
-        oxygenSensor = readOxygenSensor();
-        OS_waitNextPeriod();
-	}
+	  while(1) {
+			//int start_tick = HAL_GetTick();
+	        crankshaftPosition = readCrankshaftPosition();
+	        massAirFlow = readMassAirFlow();
+	        engineTemperature = readEngineTemperature();
+	        oxygenSensor = readOxygenSensor();
+	        //int ending_tick = HAL_GetTick();
+	        //int execution_time = ending_tick - start_tick;
+	        //iteration++;
+	        //executionTimeAverage = ((executionTimeAverage * (iteration - 1)) + execution_time) / iteration;
+	        OS_waitNextPeriod();
+	 }
 }
 
 void TaskControle() {
 	while(1){
+		//int start_tick = HAL_GetTick();
 		int injectionTime = calculateInjectionTime(crankshaftPosition, massAirFlow);
 		int ignitionAdvance = calculateIgnitionAdvance(crankshaftPosition, engineTemperature);
 		controlInjectors(injectionTime);
 		controlIgnitionSystem(ignitionAdvance);
+		//int ending_tick = HAL_GetTick();
+		//int execution_time = ending_tick - start_tick;
+		//iteration++;
+		//executionTimeAverage = ((executionTimeAverage * (iteration - 1)) + execution_time) / iteration;
 		OS_waitNextPeriod();
 	}
 }
 
 void TaskDiagnostico() {
 	while(1){
+		//int start_tick = HAL_GetTick();
 		monitorSensors();
 		monitorActuators();
 		detectFaults();
+		//int ending_tick = HAL_GetTick();
+		//int execution_time = ending_tick - start_tick;
+		//iteration++;
+		//executionTimeAverage = ((executionTimeAverage * (iteration - 1)) + execution_time) / iteration;
 		OS_waitNextPeriod();
 	}
 
