@@ -35,16 +35,16 @@ To analyze the schedulability of these tasks, the computation time of each one w
 ## Schedulability Analysis
 To determine if the system is schedulable, we use the following formula for the utilization factor \( U \):
 
-\[ U = \sum_{i=1}^{n} \frac{C_i}{T_i} \]
+$$ \[ U = \sum_{i=1}^{n} \frac{C_i}{T_i} \]
 
-where \( C_i \) is the computation time and \( T_i \) is the period for each task \( i \).
+where $$\( C_i \) is the computation time and $$\( T_i \) is the period for each task $$\( i \).
 
 Calculating the utilization factor for the given tasks:
 
-\[ U = \frac{0.0058140927}{2} + \frac{0.0271115694}{5} + \frac{0.151287213}{500} \]
+$$\[ U = \frac{0.0058140927}{2} + \frac{0.0271115694}{5} + \frac{0.151287213}{500} \]
 
-\[ U = 0.00290704635 + 0.00542231388 + 0.000302574426 \]
+$$ \[ U = 0.00290704635 + 0.00542231388 + 0.000302574426 \]
 
-\[ U = 0.008631934656 \]
+$$ \[ U = 0.008631934656 \]
 
 The utilization factor \( U = 0.008631934656 \) is well below 1, indicating that the tasks are schedulable under the given deadlines and periods.
