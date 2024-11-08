@@ -24,7 +24,7 @@ The periodic task implementation aims to abstract an injection system in an Engi
 
 To analyze the schedulability of these tasks, the computation time of each one was measured over 5 minutes, and the average computation time was calculated. To measure the time, `HAL_GetTick` was used to get the tick at the beginning and end of each task, and the average was updated.
 
-## Example Table
+## Tasks parameters table
 
 | Task             | Computation Time | Deadline | Period |
 |------------------|------------------|----------|--------|
