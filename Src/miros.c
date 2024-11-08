@@ -64,7 +64,6 @@ void OS_init() {
     OSThread_start(&idleThread,
                    UINT32_MAX,
 				   UINT32_MAX,
-				   0U,
                    &main_idleThread,
 				   stack_idleThread, (sizeof(stack_idleThread)));
 }
@@ -130,7 +129,6 @@ void OS_tick(void) {
 				if (OS_thread[i]->timeout == 0) {
 					OS_readyIndex[i] = 1;
 					OS_thread[i]->deadline = OS_thread[i]->ABSdeadline;
-					OS_thread[i]->computation_time = OS_thread[i]->ABScomputation_time;
 					OS_thread[i]->period = OS_thread[i]->ABSperiod;
 				}
 				OS_thread[i]->timeout--;
@@ -139,16 +137,11 @@ void OS_tick(void) {
         		if (OS_thread[i]->deadline < OS_thread[earliest_deadline_index]->deadline) {
         			earliest_deadline_index = i;
         		}
-        		if(OS_thread[i]->computation_time == 0){
-        			OS_readyIndex[i] = 0;
-        			OS_thread[i]->timeout = OS_thread[i]->period;
-        		}
         		OS_thread[i]->period--;
         	}
         }
         OS_thread[i]->deadline--;
     }
-    OS_thread[earliest_deadline_index]->computation_time--;
     sched_index = earliest_deadline_index;
     if (!idleVerification) sched_index = 0;
 }
@@ -168,11 +161,15 @@ void OS_yield(){
 	OS_delay(1);
 }
 
+void OS_waitNextPeriod(){
+	OS_readyIndex[OS_curr->index] = 0;
+	OS_curr->timeout = OS_curr->period;
+}
+
 void OSThread_start(
     OSThread *me,
     uint32_t absolute_deadline, /* task deadline */
 	uint32_t absolute_period,
-	uint32_t absolute_computation_time,
     OSThreadHandler threadHandler,
     void *stkSto, uint32_t stkSize)
 {
@@ -203,8 +200,6 @@ void OSThread_start(
 
     /* save the top of the stack in the thread's attibute */
     me->sp = sp;
-    me->ABScomputation_time = absolute_computation_time;
-    me->computation_time = absolute_computation_time;
     me->ABSdeadline = absolute_deadline;
     me->deadline = absolute_deadline;
     me->ABSperiod = absolute_period;

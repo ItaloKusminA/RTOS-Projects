@@ -1,55 +1,137 @@
 #include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
 #include "miros.h"
 #include "stm32f1xx_hal.h"
 
-#define TASK1_DEADLINE 5
-#define TASK1_PERIOD 8
-#define TASK1_COMPUTATION_TIME 3
-#define TASK2_DEADLINE 10
-#define TASK2_PERIOD 14
-#define TASK2_COMPUTATION_TIME 5
 
+#define SENS_PERIOD 2
+#define SENS_DEADLINE 2
+
+#define CTRL_PERIOD 5
+#define CTRL_DEADLINE 5
+
+#define DIAG_PERIOD 500
+#define DIAG_DEADLINE 500
 
 typedef struct {
     OSThread taskT;
     uint32_t stackT[40];
 } tasks_t;
 
-tasks_t task1;
-tasks_t task2;
-uint8_t current_task = 0;
+tasks_t taskSensoriamento;
+tasks_t taskControle;
+tasks_t taskDiagnostico;
+
+volatile int crankshaftPosition;
+volatile int massAirFlow;
+volatile int engineTemperature;
+volatile int oxygenSensor;
 
 
-void taskF() {
+int readCrankshaftPosition() {
+    return rand() % 360;
+}
+
+int readMassAirFlow() {
+    return rand() % 100;
+}
+
+int readEngineTemperature() {
+    return rand() % 120;
+}
+
+int readOxygenSensor() {
+    return rand() % 100;
+}
+
+
+int calculateInjectionTime(int crankshaftPosition, int massAirFlow) {
+	//Ilustrative function
+	return crankshaftPosition*massAirFlow;
+}
+
+int calculateIgnitionAdvance(int crankshaftPosition, int engineTemperature) {
+	//Ilustrative function
+	return crankshaftPosition*engineTemperature;
+}
+
+void controlInjectors(int injectionTime) {
+	//Ilustrative function
+}
+
+void controlIgnitionSystem(int ignitionAdvance) {
+	//Ilustrative function
+}
+
+
+void monitorSensors() {
+	//Ilustrative function
+}
+
+void monitorActuators() {
+	//Ilustrative function
+}
+
+void detectFaults() {
+	//Ilustrative function
+}
+
+void TaskSensoriamento() {
 	while(1){
-		current_task = 1;
+    	crankshaftPosition = readCrankshaftPosition();
+        massAirFlow = readMassAirFlow();
+        engineTemperature = readEngineTemperature();
+        oxygenSensor = readOxygenSensor();
+        OS_waitNextPeriod();
 	}
 }
-void taskS() {
+
+void TaskControle() {
 	while(1){
-		current_task = 2;
+		int injectionTime = calculateInjectionTime(crankshaftPosition, massAirFlow);
+		int ignitionAdvance = calculateIgnitionAdvance(crankshaftPosition, engineTemperature);
+		controlInjectors(injectionTime);
+		controlIgnitionSystem(ignitionAdvance);
+		OS_waitNextPeriod();
 	}
+}
+
+void TaskDiagnostico() {
+	while(1){
+		monitorSensors();
+		monitorActuators();
+		detectFaults();
+		OS_waitNextPeriod();
+	}
+
 }
 
 int main() {
+    srand(time(NULL));
 
     OS_init();
 
     OSThread_start(
-        &task1.taskT,
-		TASK1_DEADLINE,
-		TASK1_PERIOD,
-		TASK1_COMPUTATION_TIME,
-        &taskF,
-        &task1.stackT, sizeof(task1.stackT));
+        &taskSensoriamento.taskT,
+        SENS_DEADLINE,
+        SENS_PERIOD,
+        &TaskSensoriamento,
+        &taskSensoriamento.stackT, sizeof(taskSensoriamento.stackT));
 
     OSThread_start(
-        &task2.taskT,
-		TASK2_DEADLINE,
-		TASK2_PERIOD,
-		TASK2_COMPUTATION_TIME,
-        &taskS,
-        &task2.stackT, sizeof(task2.stackT));
+        &taskControle.taskT,
+        CTRL_DEADLINE,
+        CTRL_PERIOD,
+        &TaskControle,
+        &taskControle.stackT, sizeof(taskControle.stackT));
+
+    OSThread_start(
+        &taskDiagnostico.taskT,
+        DIAG_DEADLINE,
+        DIAG_PERIOD,
+        &TaskDiagnostico,
+        &taskDiagnostico.stackT, sizeof(taskDiagnostico.stackT));
 
     OS_run();
 

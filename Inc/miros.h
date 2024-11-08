@@ -40,10 +40,8 @@ typedef struct OSThread {
     uint32_t timeout; /* timeout delay down-counter */
     uint32_t ABSdeadline; /* thread priority */
     uint32_t ABSperiod;
-    uint32_t ABScomputation_time;
     uint32_t deadline; /* thread priority */
     uint32_t period;
-    uint32_t computation_time;
     uint32_t index;
     /* ... other attributes associated with a thread */
 } OSThread;
@@ -72,11 +70,12 @@ void OS_tick(void);
 /* callback to configure and start interrupts */
 void OS_onStartup(void);
 
+void OS_waitNextPeriod(void);
+
 void OSThread_start(
     OSThread *me,
     uint32_t absolute_deadline, /* task deadline */
 	uint32_t absolute_period,
-	uint32_t absolute_computation_time,
     OSThreadHandler threadHandler,
     void *stkSto, uint32_t stkSize);
 
