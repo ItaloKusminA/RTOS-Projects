@@ -32,21 +32,33 @@
 #ifndef MIROS_H
 #define MIROS_H
 
+#include <stdbool.h>
 
+typedef struct aperiodicParameters {
+	uint32_t computationTime;
+	uint32_t deadline; /* thread priority */
+}aperiodicParameters;
+
+typedef struct periodicParameters {
+    uint32_t RELdeadline; /* thread priority */
+    uint32_t RELperiod;
+    uint32_t deadline; /* thread priority */
+    uint32_t period;
+}periodicParameters;
 
 /* Thread Control Block (TCB) */
 typedef struct OSThread {
     void *sp; /* stack pointer */
-    uint32_t timeout; /* timeout delay down-counter */
-    uint32_t ABSdeadline; /* thread priority */
-    uint32_t ABSperiod;
-    uint32_t deadline; /* thread priority */
-    uint32_t period;
+    uint32_t timeout;
     uint32_t index;
+    aperiodicParameters *AP;
+	periodicParameters *PP;
+	uint32_t NPPprio;
+	uint32_t criticalRegionHistoric;
     /* ... other attributes associated with a thread */
 } OSThread;
 
-#define TICKS_PER_SEC 100U
+#define TICKS_PER_SEC 1000U
 
 typedef void (*OSThreadHandler)();
 
@@ -59,7 +71,13 @@ void OS_onIdle(void);
 void OS_sched(void);
 
 /* transfer control to the RTOS to run the threads */
-void OS_run(void);
+void OS_run(double Up);
+
+bool OS_AperiodicTaskAvailable(void);
+
+uint32_t OS_EarliestAperiodicDeadline(void);
+
+uint32_t OS_EarliestPeriodicDeadline(void);
 
 /* blocking delay */
 void OS_delay(uint32_t ticks);
@@ -70,12 +88,22 @@ void OS_tick(void);
 /* callback to configure and start interrupts */
 void OS_onStartup(void);
 
+void OS_TBSserver(OSThread *occurenceTask);
+
+void OS_waitNextOccurence(void);
+
 void OS_waitNextPeriod(void);
+
+void OSAperiodic_thread_start(
+    OSThread *me,
+	uint32_t computationTime,
+    OSThreadHandler threadHandler,
+    void *stkSto, uint32_t stkSize);
 
 void OSThread_start(
     OSThread *me,
-    uint32_t absolute_deadline, /* task deadline */
-	uint32_t absolute_period,
+    uint32_t relativeDeadline, /* task deadline */
+	uint32_t relativePeriod,
     OSThreadHandler threadHandler,
     void *stkSto, uint32_t stkSize);
 

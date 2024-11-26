@@ -30,22 +30,30 @@
 * https://github.com/QuantumLeaps/MiROS
 ****************************************************************************/
 #include <stdint.h>
-#include <stdbool.h>
 #include "miros.h"
 #include "qassert.h"
 #include "stm32f1xx.h"
 #include "stm32f1xx_hal.h"
 Q_DEFINE_THIS_FILE
 
-#define MAX_THREADS 32
+#define MAX_PERIODIC_THREADS 32
+#define MAX_APERIODIC_THREADS 32
+#define ROUND_UP(x) ((uint32_t)((x) + 0.999999))
 
 OSThread * volatile OS_curr; /* pointer to the current thread */
 OSThread * volatile OS_next; /* pointer to the next thread to run */
+OSThread * volatile next;
+OSThread * volatile lastAperiodicOccurence;
 
-OSThread *OS_thread[MAX_THREADS + 1]; /* array of threads started so far */
-uint8_t OS_readyIndex[MAX_THREADS + 1]; /* bitmask of threads that are ready to run */
-uint8_t OS_threadIndex = 0;
-uint8_t sched_index;
+
+OSThread *OS_PThread[MAX_PERIODIC_THREADS + 1];/* array of threads started so far */
+uint8_t OS_PreadyIndex[MAX_PERIODIC_THREADS + 1]; /* bitmask of threads that are ready to run */
+uint8_t OS_Pindex = 0;
+OSThread *OS_APThread[MAX_APERIODIC_THREADS];
+uint8_t OS_APreadyIndex[MAX_APERIODIC_THREADS]; /* bitmask of threads that are ready to run */
+uint8_t OS_APindex = 0;
+bool firstAperiodicOccurence = true;
+double Us; //Server utilization
 
 OSThread idleThread;
 uint32_t stack_idleThread[40];
@@ -69,15 +77,7 @@ void OS_init() {
 }
 
 void OS_sched(void) {
-	OSThread *next;
-
-	    if (sched_index == 0U) { /* idle condition? */
-	        next = OS_thread[0]; /* the idle thread */
-	    }
-	    else {
-	        next = OS_thread[sched_index];
-	        Q_ASSERT(next != (OSThread *)0);
-	    }
+	Q_ASSERT(next != (OSThread *)0);
     /* trigger PendSV, if needed */
     if (next != OS_curr) {
         OS_next = next;
@@ -94,23 +94,45 @@ void OS_sched(void) {
      * */
 }
 
-void OS_run(void) {
+void OS_run(double Up) {
     /* callback to configure and start interrupts */
+	Us = 1 - Up;
 	bool idleVerification = false;
-	int earliest_deadline_index = 0;
-	for(int i = 1; i < OS_threadIndex+1; i++){
-		if(OS_thread[i]){
-			if(OS_readyIndex[i] == 0){
-			}
-			else{
-				if (OS_thread[i]->deadline < OS_thread[earliest_deadline_index]->deadline) {
-					earliest_deadline_index = i;
-				}
+	uint8_t Pearliest_deadline_index = 0;
+	for (int i = 1; i < OS_Pindex+1; i++) {
+		if (OS_PThread[i]) {
+			if (OS_PreadyIndex[i] == 0){
+			} else {
 				idleVerification = true;
+				if (OS_PThread[i]->PP->deadline < OS_PThread[Pearliest_deadline_index]->PP->deadline) {
+					Pearliest_deadline_index = i;
+				}
 			}
 		}
 	}
-	if(!idleVerification) sched_index = 0;
+	if (!idleVerification) Pearliest_deadline_index = 0;
+	if(OS_AperiodicTaskAvailable()){
+		uint8_t APearliest_deadline_index = 0;
+		for (int i = 0; i < OS_APindex; i++) {
+			if (OS_APThread[i]) {
+				if (OS_APreadyIndex[i] == 0){
+				} else {
+					if (OS_APThread[i]->AP->deadline < OS_APThread[APearliest_deadline_index]->AP->deadline) {
+						APearliest_deadline_index = i;
+					}
+				}
+			}
+		}
+		if (Pearliest_deadline_index < APearliest_deadline_index){
+			next = OS_APThread[APearliest_deadline_index];
+		}
+		else{
+			next = OS_PThread[Pearliest_deadline_index];
+		}
+	}
+	else{
+		next = OS_PThread[Pearliest_deadline_index];
+	}
     OS_onStartup();
     __disable_irq();
     OS_sched();
@@ -120,39 +142,103 @@ void OS_run(void) {
     Q_ERROR();
 }
 
-void OS_tick(void) {
-    bool idleVerification = false;
-    uint8_t earliest_deadline_index = 0;
-    for (int i = 1; i < OS_threadIndex+1; i++) {
-        if (OS_thread[i]) {
-        	if (OS_readyIndex[i] == 0){
-				if (OS_thread[i]->timeout == 0) {
-					OS_readyIndex[i] = 1;
-					OS_thread[i]->deadline = OS_thread[i]->ABSdeadline;
-					OS_thread[i]->period = OS_thread[i]->ABSperiod;
+bool OS_AperiodicTaskAvailable(void){
+	for (int i = 0; i < OS_APindex; i++) {
+		if (OS_APreadyIndex[i] == 1) return true;
+	}
+	return false;
+}
+
+uint32_t OS_EarliestAperiodicDeadline(void){
+	uint8_t earliest_deadline_index = 0;
+	for (int i = 0; i < OS_APindex; i++) {
+		if (OS_APThread[i]) {
+			if (OS_APreadyIndex[i] == 0){
+				if (OS_APThread[i]->timeout == 0) {
+					OS_PreadyIndex[i] = 1;
 				}
-				OS_thread[i]->timeout--;
-        	} else {
-        		idleVerification = true;
-        		if (OS_thread[i]->deadline < OS_thread[earliest_deadline_index]->deadline) {
-        			earliest_deadline_index = i;
-        		}
-        		OS_thread[i]->period--;
-        	}
-        }
-        OS_thread[i]->deadline--;
-    }
-    sched_index = earliest_deadline_index;
-    if (!idleVerification) sched_index = 0;
+				OS_APThread[i]->timeout--;
+			} else {
+				if (OS_APThread[i]->AP->deadline < OS_APThread[earliest_deadline_index]->AP->deadline) {
+					earliest_deadline_index = i;
+				}
+			}
+		}
+		if(OS_PThread[i]->NPPprio == UINT32_MAX){
+			return i;
+		}
+		if(OS_APThread[i]->AP->deadline != 0){
+			OS_APThread[i]->AP->deadline--;
+			OS_APreadyIndex[OS_APThread[i]->index] = 0;
+		}
+	}
+	return earliest_deadline_index;
+}
+
+uint32_t OS_EarliestPeriodicDeadline(void){
+	bool idleVerification = false;
+	uint8_t earliest_deadline_index = 0;
+	for (int i = 1; i < OS_Pindex+1; i++) {
+		if (OS_PThread[i]) {
+			if (OS_PreadyIndex[i] == 0){
+				if (OS_PThread[i]->timeout == 0) {
+					OS_PreadyIndex[i] = 1;
+					OS_PThread[i]->PP->deadline = OS_PThread[i]->PP->RELdeadline;
+					OS_PThread[i]->PP->period = OS_PThread[i]->PP->RELperiod;
+				}
+				OS_PThread[i]->timeout--;
+			} else {
+				idleVerification = true;
+				if (OS_PThread[i]->PP->deadline < OS_PThread[earliest_deadline_index]->PP->deadline) {
+					earliest_deadline_index = i;
+				}
+			}
+		}
+		if(OS_PThread[i]->NPPprio == UINT32_MAX){
+			return i;
+		}
+		OS_PThread[i]->PP->period--;
+		OS_PThread[i]->PP->deadline--;
+	}
+	if (!idleVerification) return 0;
+	return earliest_deadline_index;
+}
+
+
+void OS_tick(void) {
+	uint8_t Pi = OS_EarliestPeriodicDeadline();
+	if(OS_AperiodicTaskAvailable()){
+		uint8_t APi = OS_EarliestAperiodicDeadline();
+		if (Pi > APi){
+			next = OS_APThread[APi];
+		}
+		else{
+			next = OS_PThread[Pi];
+			if(OS_PThread[Pi]->NPPprio == UINT32_MAX){
+					next = OS_PThread[Pi];
+			}
+		}
+		if (OS_APThread[APi]->NPPprio == UINT32_MAX){
+					next = OS_APThread[APi];
+		}
+	}
+	else{
+		next = OS_PThread[Pi];
+		if(OS_PThread[Pi]->NPPprio == UINT32_MAX){
+				next = OS_PThread[Pi];
+		}
+	}
 }
 
 void OS_delay(uint32_t ticks) {
     __asm volatile ("cpsid i");
-
     /* never call OS_delay from the idleThread */
-    Q_REQUIRE(OS_curr != OS_thread[0]);
+    Q_REQUIRE(OS_curr != OS_PThread[0]);
     OS_curr->timeout = ticks;
-    OS_readyIndex[OS_curr->index] = 0;
+    if(!OS_curr->AP)
+    	OS_PreadyIndex[OS_curr->index] = 0;
+    if(!OS_curr->PP)
+        OS_APreadyIndex[OS_curr->index] = 0;
     OS_sched();
     __asm volatile ("cpsie i");
 }
@@ -161,15 +247,37 @@ void OS_yield(){
 	OS_delay(1);
 }
 
-void OS_waitNextPeriod(){
-	OS_readyIndex[OS_curr->index] = 0;
-	OS_curr->timeout = OS_curr->period;
+void OS_TBSserver(OSThread *occurenceTask){
+	if(OS_APreadyIndex[occurenceTask->index] == 0){
+		if(firstAperiodicOccurence == true){
+			occurenceTask->AP->deadline = ROUND_UP((double)occurenceTask->AP->computationTime / Us);
+			firstAperiodicOccurence = false;
+		}
+		else{
+			if(OS_AperiodicTaskAvailable()){
+				occurenceTask->AP->deadline = lastAperiodicOccurence->AP->deadline + ROUND_UP((double)occurenceTask->AP->computationTime / Us);
+			}
+			else{
+				occurenceTask->AP->deadline = ROUND_UP((double)occurenceTask->AP->computationTime / Us);
+			}
+		}
+		lastAperiodicOccurence = occurenceTask;
+		OS_APreadyIndex[occurenceTask->index] = 1;
+	}
 }
 
-void OSThread_start(
+void OS_waitNextOccurence(void){
+	OS_APreadyIndex[OS_curr->index] = 0;
+}
+
+void OS_waitNextPeriod(void){
+	OS_PreadyIndex[OS_curr->index] = 0;
+	OS_curr->timeout = OS_curr->PP->period;
+}
+
+void OSAperiodic_thread_start(
     OSThread *me,
-    uint32_t absolute_deadline, /* task deadline */
-	uint32_t absolute_period,
+	uint32_t computationTime,
     OSThreadHandler threadHandler,
     void *stkSto, uint32_t stkSize)
 {
@@ -200,14 +308,70 @@ void OSThread_start(
 
     /* save the top of the stack in the thread's attibute */
     me->sp = sp;
-    me->ABSdeadline = absolute_deadline;
-    me->deadline = absolute_deadline;
-    me->ABSperiod = absolute_period;
-    me->period = absolute_period;
-    me->index = OS_threadIndex;
-    OS_thread[OS_threadIndex] = me;
-    OS_readyIndex[OS_threadIndex] = 1;
-    OS_threadIndex++;
+    me->PP = NULL;
+    me->AP->computationTime = computationTime;
+    me->AP->deadline = UINT32_MAX;
+    me->index = OS_APindex;
+    me->criticalRegionHistoric = 0;
+    me->timeout = 0;
+    me->NPPprio = 0;
+    OS_APThread[OS_APindex] = me;
+    OS_APreadyIndex[OS_APindex] = 0;
+    OS_APindex++;
+
+    /* round up the bottom of the stack to the 8-byte boundary */
+    stk_limit = (uint32_t *)(((((uint32_t)stkSto - 1U) / 8) + 1U) * 8);
+
+    /* pre-fill the unused part of the stack with 0xDEADBEEF */
+    for (sp = sp - 1U; sp >= stk_limit; --sp) {
+        *sp = 0xDEADBEEFU;
+    }
+}
+
+void OSThread_start(
+    OSThread *me,
+    uint32_t relativeDeadline, /* task deadline */
+	uint32_t relativePeriod,
+    OSThreadHandler threadHandler,
+    void *stkSto, uint32_t stkSize)
+{
+    /* round down the stack top to the 8-byte boundary
+    * NOTE: ARM Cortex-M stack grows down from hi -> low memory
+    */
+    uint32_t *sp = (uint32_t *)((((uint32_t)stkSto + stkSize) / 8) * 8);
+    uint32_t *stk_limit;
+
+
+    *(--sp) = (1U << 24);  /* xPSR */
+    *(--sp) = (uint32_t)threadHandler; /* PC */
+    *(--sp) = 0x0000000EU; /* LR  */
+    *(--sp) = 0x0000000CU; /* R12 */
+    *(--sp) = 0x00000003U; /* R3  */
+    *(--sp) = 0x00000002U; /* R2  */
+    *(--sp) = 0x00000001U; /* R1  */
+    *(--sp) = 0x00000000U; /* R0  */
+    /* additionally, fake registers R4-R11 */
+    *(--sp) = 0x0000000BU; /* R11 */
+    *(--sp) = 0x0000000AU; /* R10 */
+    *(--sp) = 0x00000009U; /* R9 */
+    *(--sp) = 0x00000008U; /* R8 */
+    *(--sp) = 0x00000007U; /* R7 */
+    *(--sp) = 0x00000006U; /* R6 */
+    *(--sp) = 0x00000005U; /* R5 */
+    *(--sp) = 0x00000004U; /* R4 */
+
+    /* save the top of the stack in the thread's attibute */
+    me->sp = sp;
+    me->PP->RELdeadline = relativeDeadline;
+    me->PP->deadline = relativeDeadline;
+    me->PP->RELperiod = relativePeriod;
+    me->PP->period = relativePeriod;
+    me->index = OS_Pindex;
+    me->criticalRegionHistoric = 0;
+    me->NPPprio = 0;
+    OS_PThread[OS_Pindex] = me;
+    OS_PreadyIndex[OS_Pindex] = 1;
+    OS_Pindex++;
 
     /* round up the bottom of the stack to the 8-byte boundary */
     stk_limit = (uint32_t *)(((((uint32_t)stkSto - 1U) / 8) + 1U) * 8);
@@ -230,6 +394,8 @@ void semaphore_wait(semaphore_t* semaphore){
 		OS_yield(1);
 		__disable_irq();
 	}
+	OS_curr->NPPprio = UINT32_MAX;
+	OS_curr->criticalRegionHistoric++;
 	semaphore->current_value--;
 	__enable_irq();
 }
@@ -237,6 +403,10 @@ void semaphore_wait(semaphore_t* semaphore){
 void semaphore_post(semaphore_t* semaphore){
 	Q_ASSERT(semaphore);
 	__disable_irq();
+	OS_curr->criticalRegionHistoric--;
+	if(OS_curr->criticalRegionHistoric == 0){
+		OS_curr->NPPprio = 0;
+	}
 	semaphore->current_value++;
 	__enable_irq();
 
