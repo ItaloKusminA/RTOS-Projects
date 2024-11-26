@@ -1,4 +1,4 @@
-# Periodic Task and EDF Scheduler Implementation on MirOS
+# Total Bandwidth Server and Non-Preemptive Protocol Implementation on MirOS
 
 ## Student Information
 
