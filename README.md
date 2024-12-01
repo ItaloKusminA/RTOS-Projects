@@ -19,7 +19,7 @@ $$
 D_i = \max(t_{current}, D_{last}) + \frac{C_i}{U_s}
 $$
 
-where \ D_i \ is the deadline, \ t_{current} \ is the current time, \ D_{last} \ is the last deadline, \ C_i \ is the computation time, and \ U_s \ is the server utilization. Essentially, the deadline assigned to the task is the sum of the current time (or the last deadline, whichever is greater) and the ratio of the task's computation time to the server utilization. The Earliest Deadline Scheduler then schedules the aperiodic task if its deadline is earlier than those of the periodic tasks.
+where  $D_i$ is the deadline, $t_{current}$ is the current time, $D_{last}$ is the last deadline, $C_i$ is the computation time, and $U_s$ is the server utilization. Essentially, the deadline assigned to the task is the sum of the current time (or the last deadline, whichever is greater) and the ratio of the task's computation time to the server utilization. The Earliest Deadline Scheduler then schedules the aperiodic task if its deadline is earlier than those of the periodic tasks.
 
 Finally, the `OS_waitNextOccurence` function was implemented, functioning similarly to `OS_waitNextPeriod`. It handles the end of a task's execution by resetting the deadline to `UINT32_MAX` and the ready index to 0 (not ready to run).
 
