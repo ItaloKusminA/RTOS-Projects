@@ -57,8 +57,12 @@ double Us; //Server utilization
 
 OSThread idleThread;
 uint32_t stack_idleThread[40];
+periodicParameters ITP;
+aperiodicParameters ITAP;
 
+bool idle = true;
 void main_idleThread() {
+	idle = false;
     while (1) {
         OS_onIdle();
     }
@@ -67,7 +71,8 @@ void main_idleThread() {
 void OS_init() {
     /* set the PendSV interrupt priority to the lowest level 0xFF */
     *(uint32_t volatile *)0xE000ED20 |= (0xFFU << 16);
-
+    idleThread.PP = &ITP;
+    idleThread.AP = &ITAP;
     /* start idleThread thread */
     OSThread_start(&idleThread,
                    UINT32_MAX,
@@ -95,50 +100,25 @@ void OS_sched(void) {
 }
 
 void OS_run(double Up) {
-    /* callback to configure and start interrupts */
-	Us = 1 - Up;
-	bool idleVerification = false;
-	uint8_t Pearliest_deadline_index = 0;
-	for (int i = 1; i < OS_Pindex+1; i++) {
-		if (OS_PThread[i]) {
-			if (OS_PreadyIndex[i] == 0){
-			} else {
-				idleVerification = true;
-				if (OS_PThread[i]->PP->deadline < OS_PThread[Pearliest_deadline_index]->PP->deadline) {
-					Pearliest_deadline_index = i;
-				}
-			}
-		}
-	}
-	if (!idleVerification) Pearliest_deadline_index = 0;
-	if(OS_AperiodicTaskAvailable()){
-		uint8_t APearliest_deadline_index = 0;
-		for (int i = 0; i < OS_APindex; i++) {
-			if (OS_APThread[i]) {
-				if (OS_APreadyIndex[i] == 0){
-				} else {
-					if (OS_APThread[i]->AP->deadline < OS_APThread[APearliest_deadline_index]->AP->deadline) {
-						APearliest_deadline_index = i;
-					}
-				}
-			}
-		}
-		if (Pearliest_deadline_index < APearliest_deadline_index){
-			next = OS_APThread[APearliest_deadline_index];
-		}
-		else{
-			next = OS_PThread[Pearliest_deadline_index];
-		}
-	}
-	else{
-		next = OS_PThread[Pearliest_deadline_index];
-	}
+    Us = 1 - Up;
+    uint8_t Pearliest_deadline_index = OS_EarliestPeriodicDeadline();
+    uint8_t APearliest_deadline_index = 0;
+
+    if (OS_AperiodicTaskAvailable()) {
+        APearliest_deadline_index = OS_EarliestAperiodicDeadline();
+    }
+
+    if (OS_PThread[Pearliest_deadline_index]->PP->deadline < OS_APThread[APearliest_deadline_index]->AP->deadline) {
+        next = OS_PThread[Pearliest_deadline_index];
+    } else {
+        next = OS_APThread[APearliest_deadline_index];
+    }
+
     OS_onStartup();
     __disable_irq();
     OS_sched();
     __enable_irq();
 
-    /* the following code should never execute */
     Q_ERROR();
 }
 
@@ -154,22 +134,17 @@ uint32_t OS_EarliestAperiodicDeadline(void){
 	for (int i = 0; i < OS_APindex; i++) {
 		if (OS_APThread[i]) {
 			if (OS_APreadyIndex[i] == 0){
-				if (OS_APThread[i]->timeout == 0) {
-					OS_PreadyIndex[i] = 1;
-				}
-				OS_APThread[i]->timeout--;
 			} else {
 				if (OS_APThread[i]->AP->deadline < OS_APThread[earliest_deadline_index]->AP->deadline) {
 					earliest_deadline_index = i;
 				}
 			}
-		}
-		if(OS_PThread[i]->NPPprio == UINT32_MAX){
-			return i;
-		}
-		if(OS_APThread[i]->AP->deadline != 0){
-			OS_APThread[i]->AP->deadline--;
-			OS_APreadyIndex[OS_APThread[i]->index] = 0;
+			if(OS_PThread[i]->NPPprio == UINT32_MAX){
+				return i;
+			}
+			if(OS_APThread[i]->AP->deadline != 0){
+				OS_APreadyIndex[OS_APThread[i]->index] = 0;
+			}
 		}
 	}
 	return earliest_deadline_index;
@@ -178,56 +153,69 @@ uint32_t OS_EarliestAperiodicDeadline(void){
 uint32_t OS_EarliestPeriodicDeadline(void){
 	bool idleVerification = false;
 	uint8_t earliest_deadline_index = 0;
-	for (int i = 1; i < OS_Pindex+1; i++) {
+	for (int i = 1; i < OS_Pindex; i++) {
 		if (OS_PThread[i]) {
 			if (OS_PreadyIndex[i] == 0){
-				if (OS_PThread[i]->timeout == 0) {
-					OS_PreadyIndex[i] = 1;
-					OS_PThread[i]->PP->deadline = OS_PThread[i]->PP->RELdeadline;
-					OS_PThread[i]->PP->period = OS_PThread[i]->PP->RELperiod;
-				}
-				OS_PThread[i]->timeout--;
 			} else {
 				idleVerification = true;
 				if (OS_PThread[i]->PP->deadline < OS_PThread[earliest_deadline_index]->PP->deadline) {
 					earliest_deadline_index = i;
 				}
 			}
+			if(OS_PThread[i]->NPPprio == UINT32_MAX){
+				return i;
+			}
 		}
-		if(OS_PThread[i]->NPPprio == UINT32_MAX){
-			return i;
-		}
-		OS_PThread[i]->PP->period--;
-		OS_PThread[i]->PP->deadline--;
 	}
 	if (!idleVerification) return 0;
 	return earliest_deadline_index;
 }
 
-
 void OS_tick(void) {
-	uint8_t Pi = OS_EarliestPeriodicDeadline();
-	if(OS_AperiodicTaskAvailable()){
-		uint8_t APi = OS_EarliestAperiodicDeadline();
-		if (Pi > APi){
-			next = OS_APThread[APi];
-		}
-		else{
-			next = OS_PThread[Pi];
-			if(OS_PThread[Pi]->NPPprio == UINT32_MAX){
-					next = OS_PThread[Pi];
-			}
-		}
-		if (OS_APThread[APi]->NPPprio == UINT32_MAX){
-					next = OS_APThread[APi];
-		}
-	}
-	else{
-		next = OS_PThread[Pi];
-		if(OS_PThread[Pi]->NPPprio == UINT32_MAX){
-				next = OS_PThread[Pi];
-		}
-	}
+    uint8_t Pi = OS_EarliestPeriodicDeadline();
+    if (OS_AperiodicTaskAvailable()) {
+        uint8_t APi = OS_EarliestAperiodicDeadline();
+        if (OS_PThread[Pi]->PP->deadline < OS_APThread[APi]->AP->deadline) {
+            next = OS_PThread[Pi];
+            if(OS_APThread[APi]->NPPprio == UINT32_MAX) next = OS_APThread[APi];
+        } else {
+            next = OS_APThread[APi];
+            if(OS_PThread[Pi]->NPPprio == UINT32_MAX) next = OS_PThread[APi];
+        }
+    } else {
+        next = OS_PThread[Pi];
+    }
+
+    for (int i = 1; i < OS_Pindex; i++) {
+        if (OS_PThread[i]) {
+            if (OS_PreadyIndex[i] == 0) {
+                OS_PThread[i]->timeout--;
+                if (OS_PThread[i]->timeout == 0) {
+                    OS_PreadyIndex[i] = 1;
+                    OS_PThread[i]->PP->deadline = OS_PThread[i]->PP->RELdeadline;
+                    OS_PThread[i]->PP->period = OS_PThread[i]->PP->RELperiod;
+                }
+            }
+            OS_PThread[i]->PP->period--;
+            OS_PThread[i]->PP->deadline--;
+        }
+    }
+
+    if (OS_AperiodicTaskAvailable()) {
+        for (int i = 0; i < OS_APindex; i++) {
+            if (OS_APThread[i]) {
+                if (OS_APreadyIndex[i] == 0) {
+                    OS_APThread[i]->timeout--;
+                    if (OS_APThread[i]->timeout == 0) {
+                        OS_APreadyIndex[i] = 1;
+                    }
+                }
+                if (OS_APThread[i]->AP->deadline != 0) {
+                    OS_APThread[i]->AP->deadline--;
+                }
+            }
+        }
+    }
 }
 
 void OS_delay(uint32_t ticks) {
@@ -247,7 +235,7 @@ void OS_yield(){
 	OS_delay(1);
 }
 
-void OS_TBSserver(OSThread *occurenceTask){
+void OS_TBS(OSThread *occurenceTask){
 	if(OS_APreadyIndex[occurenceTask->index] == 0){
 		if(firstAperiodicOccurence == true){
 			occurenceTask->AP->deadline = ROUND_UP((double)occurenceTask->AP->computationTime / Us);
@@ -268,11 +256,18 @@ void OS_TBSserver(OSThread *occurenceTask){
 
 void OS_waitNextOccurence(void){
 	OS_APreadyIndex[OS_curr->index] = 0;
+	OS_APThread[OS_curr->index]->AP->deadline = UINT32_MAX;
+	if(OS_AperiodicTaskAvailable())
+		next = OS_APThread[OS_EarliestAperiodicDeadline()];
+	else next = OS_PThread[OS_EarliestPeriodicDeadline()];
+	OS_sched();
 }
 
 void OS_waitNextPeriod(void){
 	OS_PreadyIndex[OS_curr->index] = 0;
 	OS_curr->timeout = OS_curr->PP->period;
+	next = OS_PThread[OS_EarliestPeriodicDeadline()];
+	OS_sched();
 }
 
 void OSAperiodic_thread_start(
@@ -308,7 +303,7 @@ void OSAperiodic_thread_start(
 
     /* save the top of the stack in the thread's attibute */
     me->sp = sp;
-    me->PP = NULL;
+    //me->PP = NULL;
     me->AP->computationTime = computationTime;
     me->AP->deadline = UINT32_MAX;
     me->index = OS_APindex;
@@ -362,6 +357,7 @@ void OSThread_start(
 
     /* save the top of the stack in the thread's attibute */
     me->sp = sp;
+    //me->AP = NULL;
     me->PP->RELdeadline = relativeDeadline;
     me->PP->deadline = relativeDeadline;
     me->PP->RELperiod = relativePeriod;

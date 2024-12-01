@@ -88,7 +88,7 @@ void OS_tick(void);
 /* callback to configure and start interrupts */
 void OS_onStartup(void);
 
-void OS_TBSserver(OSThread *occurenceTask);
+void OS_TBS(OSThread *occurenceTask);
 
 void OS_waitNextOccurence(void);
 

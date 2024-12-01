@@ -194,6 +194,12 @@ void SysTick_Handler(void)
   /* USER CODE END SysTick_IRQn 1 */
 }
 
+void EXTI0_IRQHandler(void) {
+	HAL_GPIO_EXTI_Callback(GPIO_PIN_0);
+	__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
+}
+
+
 void OS_onStartup(void) {
     SystemCoreClockUpdate();
     SysTick_Config(SystemCoreClock / TICKS_PER_SEC);
