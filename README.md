@@ -56,8 +56,8 @@ To determine if the tasks are schedulable using the Earliest Deadline First (EDF
 $$ U_i = \frac{C_i}{T_i} $$
 
 where:
-- $ C_i $ is the execution time of the task.
-- $ T_i $ is the period of the task.
+- $C_i$ is the execution time of the task.
+- $T_i$ is the period of the task.
 
 #### Task SENS
 $$ U_{SENS} = \frac{50 \, \text{ms}}{200 \, \text{ms}} = 0.25 $$
@@ -79,7 +79,7 @@ $$ U_{remaining} = 1 - U_{total} = 1 - 0.45 = 0.55 $$
 To determine if `DIAG` can be scheduled, we need to ensure that it can fit within the available slack time. Given that it does not have a specified period and is event-driven (triggered by an interrupt on PB0), we check if the system can accommodate its execution time within the slack.
 
 - Execution Time of DIAG: 30 ms
-- Total available time in a 200 ms period (least common multiple of periods of periodic tasks): $ 200 \times 0.55 = 110 \, \text{ms} $
+- Total available time in a 200 ms period (least common multiple of periods of periodic tasks): $200 \times 0.55 = 110 \, \text{ms}$
 
 Since the execution time of `DIAG` (30 ms) is less than the available slack time (110 ms) in a 200 ms window, `DIAG` is schedulable within the system.
 
