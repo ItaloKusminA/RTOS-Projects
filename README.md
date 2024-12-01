@@ -87,25 +87,27 @@ Since the execution time of `DIAG` (30 ms) is less than the available slack time
 
 The given periodic tasks (SENS and CTRL) are schedulable under the EDF algorithm as their total utilization is less than 1. The aperiodic task (DIAG) is also schedulable as its execution time fits within the available slack time of the periodic tasks.
 
+## Problems Solved with the STM32 BluePill
 
-## Problemns solved with the STM32 BluePill
+Many of the STM32f1 series (Bluepill) have problems being recognized during the first use with the ST-LINK V2. To solve these problems, it was observed that using the STLink Utility, which can be found at this link: [STLink Utility](https://www.st.com/en/development-tools/stsw-link004.html), it is possible to resolve the issue by following these steps:
 
-Many of the STM32f1 series (Bluepill) has problemns to find them in the first utilization with the ST-LINK V2, to solve this problemns was observed that using the STLink Utility, which can be find in this link: https://www.st.com/en/development-tools/stsw-link004.html it is possible to find it following this steps:
+1. Change both jumpers of the boot to the "1" position, accessing the RAM memory of the STM32.
+   
+   ### Boot Example
+   ![Boot example](./BOOTSTM.png)
 
-- Change the both jumpers of the boot to the "1" side, accessing the RAM memory of STM32;
-### Boot Example
+2. Connect to the target using the STLink Utility.
+   
+   ### Connect to Target
+   ![Connect to target](./Connect.png)
 
-![Boot example](./BOOTSTM.png)
-- Connect to target using the STLINK Utility
-###  Connect to target
+3. Perform a full chip erase.
+   
+   ### Full Chip Erase
+   ![Full chip erase](./Erase.png)
 
-![Connect to target](./Connect.png)
-- Full chip erase
+4. Finally, change the boot jumpers back to the "0" position and try to run your project again.
 
-###  Full chip erase
-
-![Full chip erase](./Erase.png)
-- Finally, change the boot jumpers to "0" again and try to run your project again.
-- It is possible that you have problems with debuging your project, it is possible to solve in two ways:
-  - If your project doesnt have an .ioc file, you must uninstall and install again the STMCubeIDE
-  - If your project has an .ioc, you must go on "Pinout&Configuration", and then "System Core" and change the "Debug" option to "Serial Wire"
+If you encounter problems debugging your project, it can be resolved in two ways:
+- If your project doesn't have an `.ioc` file, you must uninstall and reinstall the STM32CubeIDE.
+- If your project has an `.ioc` file, go to "Pinout & Configuration," then "System Core," and change the "Debug" option to "Serial Wire."
