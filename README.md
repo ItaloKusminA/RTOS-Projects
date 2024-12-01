@@ -111,3 +111,6 @@ Many of the STM32f1 series (Bluepill) have problems being recognized during the 
 If you encounter problems debugging your project, it can be resolved in two ways:
 - If your project doesn't have an `.ioc` file, you must uninstall and reinstall the STM32CubeIDE.
 - If your project has an `.ioc` file, go to "Pinout & Configuration," then "System Core," and change the "Debug" option to "Serial Wire."
+
+  ### System Core
+   ![SystemCore](./SystemCore.png)
