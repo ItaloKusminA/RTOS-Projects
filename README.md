@@ -1,4 +1,4 @@
-# Total Bandwidth Server and Non-Preemptive Protocol Implementation on MirOS
+![image](https://github.com/user-attachments/assets/e5dc09dc-1a0d-4989-a909-9ff6c8adcd56)# Total Bandwidth Server and Non-Preemptive Protocol Implementation on MirOS
 
 ## Student Information
 
@@ -90,4 +90,20 @@ The given periodic tasks (SENS and CTRL) are schedulable under the EDF algorithm
 
 ## Problemns solved with the STM32 BluePill
 
-Many times, with the STM32, its   
+Many of the STM32f1 series (Bluepill) has problemns to find them in the first utilization with the ST-LINK V2, to solve this problemns was observed that using the STLink Utility, which can be find in this link: https://www.st.com/en/development-tools/stsw-link004.html it is possible to find it following this steps:
+
+- Change the both jumpers of the boot to the "1" side, accessing the RAM memory of STM32;
+### Boot Example
+
+![Boot example](./BOOTSTM.png)
+- Connect to target using the STLINK Utility
+###  Connect to target
+
+![Connect to target](./Connect.png)
+- Full chip erase
+
+###  Full chip erase
+
+![Full chip erase](./Erase.png)
+- Finally, change the boot jumpers to "0" again and try to run your project again.
+- It is possible that you have problems with debuging your project, it is possible to solve by 
