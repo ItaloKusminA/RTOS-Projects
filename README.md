@@ -7,15 +7,22 @@ Matriculation: 22101930
 
 ## Total Bandwidth Server Implementation
 
-The total bandwidth server implementation was achieved by using the function `OS_TBSserver`, which utilizes the Total Bandwidth Server (TBS) algorithm to set the deadlines of tasks. The deadline is given by:
+To implement the Total Bandwidth Server (TBS), the first change was to modify the `OSThread` structure by adding two additional parameters: `aperiodicParameters` for aperiodic tasks, which store the computation time of each task, and `periodicParameters`, which store the relative deadline and relative period. The period and deadline are dynamically adjusted to select the task with the earliest deadline.
+
+A new vector of structs, `OS_APThread`, was created to store the started aperiodic tasks. Additionally, `OS_APreadyIndex` was introduced to keep track of the aperiodic tasks that are ready to run.
+
+Next, the `OSAperiodic_thread_start` function was implemented. Its purpose is similar to `OSThread_start`, but with a key difference: aperiodic tasks start with the ready index set to 0 (not ready to run). This function initializes the `aperiodicParameters` structure with the received computation time and sets the deadline to `UINT32_MAX`. In contrast, `OSThread_start` initializes the `periodicParameters` with the user-provided parameters.
+
+The TBS implementation is achieved using the `OS_TBSserver` function, which applies the TBS algorithm to set task deadlines and update the ready index to 1 (ready to run). The deadline is calculated as follows:
 
 $$
 D_i = \max(t_{current}, D_{last}) + \frac{C_i}{U_s}
 $$
 
-where \(D_i\) is the deadline, \(t_{current}\) is the current time, \(D_{last}\) is the last deadline, \(C_i\) is the computation time, and \(U_s\) is the server utilization.
+where \( D_i \) is the deadline, \( t_{current} \) is the current time, \( D_{last} \) is the last deadline, \( C_i \) is the computation time, and \( U_s \) is the server utilization. Essentially, the deadline assigned to the task is the sum of the current time (or the last deadline, whichever is greater) and the ratio of the task's computation time to the server utilization. The Earliest Deadline Scheduler then schedules the aperiodic task if its deadline is earlier than those of the periodic tasks.
 
-The EDF (Earliest Deadline First) scheduler selects the task with the earliest deadline for execution. Several modifications were made to enable the OS to schedule aperiodic tasks, such as altering the OS thread structure to include parameters for aperiodic and periodic tasks and implementing the `OSAperiodic_thread_start` function to start and queue aperiodic tasks.
+Finally, the `OS_waitNextOccurence` function was implemented, functioning similarly to `OS_waitNextPeriod`. It handles the end of a task's execution by resetting the deadline to `UINT32_MAX` and the ready index to 0 (not ready to run).
+
 
 ## Aperiodic Task Implementation
 
@@ -55,3 +62,7 @@ The system is based on the Minimal Real-time Operating System (MiROS) and utiliz
 ### Periodic Tasks
 
 The periodic tasks in the system are defined with their periods, deadlines, and worst-case computation times (WCCT).
+
+## Problemns solved with the STM32 BluePill
+
+Many times, with the STM32, its   
