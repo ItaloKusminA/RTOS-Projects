@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/e5dc09dc-1a0d-4989-a909-9ff6c8adcd56)# Total Bandwidth Server and Non-Preemptive Protocol Implementation on MirOS
+# Total Bandwidth Server and Non-Preemptive Protocol Implementation on MirOS
 
 ## Student Information
 
@@ -106,4 +106,6 @@ Many of the STM32f1 series (Bluepill) has problemns to find them in the first ut
 
 ![Full chip erase](./Erase.png)
 - Finally, change the boot jumpers to "0" again and try to run your project again.
-- It is possible that you have problems with debuging your project, it is possible to solve by 
+- It is possible that you have problems with debuging your project, it is possible to solve in two ways:
+  - If your project doesnt have an .ioc file, you must uninstall and install again the STMCubeIDE
+  - If your project has an .ioc, you must go on "Pinout&Configuration", and then "System Core" and change the "Debug" option to "Serial Wire"
