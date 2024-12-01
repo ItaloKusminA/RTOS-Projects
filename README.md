@@ -34,7 +34,7 @@ The non-preemptive protocol was implemented by adding a parameter `NPPprio` to t
 
 ## Schedulability Analysis
 
-The schedulability analysis ensures that all tasks meet their deadlines, both periodic and aperiodic. A significant safety margin was incorporated into the execution times to guarantee that tasks complete within their deadlines even under varying load conditions.
+The schedulability analysis ensures that all tasks meet their deadlines, both periodic and aperiodic. The computation time was measured in the second project. Then, a significant safety margin was incorporated into the execution times to guarantee that tasks complete within their deadlines even under varying load conditions. This is crucial because the computation time of each task is needed by the TBS to calculate the deadlines.
 
 ### Task Execution Times, Deadlines, and Periods
 
@@ -51,7 +51,7 @@ The schedulability analysis ensures that all tasks meet their deadlines, both pe
 
 ### Utilization Calculation
 
-To determine if the tasks are schedulable using the Earliest Deadline First (EDF) algorithm, we need to ensure that the total utilization is less than or equal to 1. The utilization \( U \) for each periodic task is calculated as follows:
+To determine if the tasks are schedulable using the Earliest Deadline First (EDF) algorithm, we need to ensure that the total utilization is less than or equal to 1. The utilization $U$ for each periodic task is calculated as follows:
 
 $$ U_i = \frac{C_i}{T_i} $$
 
@@ -79,7 +79,7 @@ $$ U_{remaining} = 1 - U_{total} = 1 - 0.45 = 0.55 $$
 To determine if `DIAG` can be scheduled, we need to ensure that it can fit within the available slack time. Given that it does not have a specified period and is event-driven (triggered by an interrupt on PB0), we check if the system can accommodate its execution time within the slack.
 
 - Execution Time of DIAG: 30 ms
-- Total available time in a 200 ms period (least common multiple of periods of periodic tasks): $200 \times 0.55 = 110 \, \text{ms}$
+- Total available time in a 200 ms period (least common multiple of periods of periodic tasks): $200 \times 0.55 = 110 \ \text{ms}$
 
 Since the execution time of `DIAG` (30 ms) is less than the available slack time (110 ms) in a 200 ms window, `DIAG` is schedulable within the system.
 
@@ -87,20 +87,6 @@ Since the execution time of `DIAG` (30 ms) is less than the available slack time
 
 The given periodic tasks (SENS and CTRL) are schedulable under the EDF algorithm as their total utilization is less than 1. The aperiodic task (DIAG) is also schedulable as its execution time fits within the available slack time of the periodic tasks.
 
-
-### Comments on Safety Margins
-
-To ensure the reliability of the system, a significant safety margin was added to the execution times of the tasks. This safety margin accounts for unexpected delays and variations in task execution, ensuring that all tasks meet their deadlines even under high load or unpredictable conditions.
-
-## System Schedulability with EDF and TBS Server
-
-### System Description
-
-The system is based on the Minimal Real-time Operating System (MiROS) and utilizes the Earliest Deadline First (EDF) scheduling algorithm for periodic tasks and a Total Bandwidth Server (TBS) for aperiodic tasks. The combination of EDF with the TBS server ensures that all periodic tasks are completed within their deadlines while efficiently managing the execution of aperiodic tasks.
-
-### Periodic Tasks
-
-The periodic tasks in the system are defined with their periods, deadlines, and worst-case computation times (WCCT).
 
 ## Problemns solved with the STM32 BluePill
 
