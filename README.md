@@ -3,3 +3,5 @@
 Producer and consumer implementation using semaphores
 ## Project 2
 EDF Scheduler implementation with periodic tasks 
+## Project 3
+Total Bandwidth Server implementation with aperiodic tasks and Non-Preempitve Protocol to resource management
