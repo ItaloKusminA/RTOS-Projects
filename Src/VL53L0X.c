@@ -7,7 +7,6 @@
 
 // Defines /////////////////////////////////////////////////////////////////////
 #include "i2c.h"
-#include "init.h"
 // Record the current time to check an upcoming timeout against
 //#define startTimeout() (timeout_start_ms = millis())
 
@@ -975,9 +974,9 @@ bool VL53L0X_performSingleRefCalibration(struct VL53L0X* dev, uint8_t vhv_init_b
 
 
 void VL53L0X_startTimeout(struct VL53L0X* dev){
-	dev->timeout_start_ms = sysTick_Time;
+	dev->timeout_start_ms = HAL_GetTick();
 }
 
 bool VL53L0X_checkTimeoutExpired(struct VL53L0X* dev){
-	return (dev->io_timeout > 0 && (sysTick_Time - dev->timeout_start_ms) > dev->io_timeout);
+	return (dev->io_timeout > 0 && (HAL_GetTick() - dev->timeout_start_ms) > dev->io_timeout);
 }

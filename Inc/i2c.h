@@ -9,6 +9,7 @@
 #define I2C_H_
 
 #include "stm32f1xx.h"
+#include "stm32f1xx_hal.h"
 
 // set this to 1 to remap the SDA/SCL pins from PB6/7 to PB8/9
 #define I2C1_REMAP 0

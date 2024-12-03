@@ -5,7 +5,6 @@
  *  see LICENCE.txt
  */
 #include "i2c.h"
-#include "init.h" // for SysTick_Time
 // check the error flag and set the corresponding error code,
 // then clear the corresponding flag
 uint8_t i2c1_check_error(){
@@ -91,20 +90,20 @@ uint8_t i2c_read( uint8_t slave_address, uint8_t* data, uint8_t N ){
 	I2C1->CR1 |= I2C_CR1_START;
 	// wait until START has been sent
 	// check for an error to prevent getting stuck in the loop
-	uint32_t t1 = sysTick_Time;
+	uint32_t t1 = HAL_GetTick();
 	while( !(I2C1->SR1 & I2C_SR1_SB) ){
 		i2c1_error = i2c1_check_error();
-		if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+		if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 		if( i2c1_error > 0) goto stop;
 	}
 	// send slave address + R/W bit (1 for read)
 	I2C1->DR = (slave_address << 1) | 1;
 	// wait until slave address has been sent
 	// check for an error to prevent getting stuck in the loop
-	t1 = sysTick_Time;
+	t1 = HAL_GetTick();
 	while( !(I2C1->SR1 & I2C_SR1_ADDR) ){
 		i2c1_error = i2c1_check_error();
-		if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+		if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 		if( i2c1_error > 0) goto stop;
 	}
 	if (N==1){
@@ -119,20 +118,20 @@ uint8_t i2c_read( uint8_t slave_address, uint8_t* data, uint8_t N ){
 		__enable_irq();
 		// wait until data receive register not empty
 		// check for an error to prevent getting stuck in the loop
-		t1 = sysTick_Time;
+		t1 = HAL_GetTick();
 		while( !(I2C1->SR1 & I2C_SR1_RXNE) ){
 			i2c1_error = i2c1_check_error();
-			if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+			if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 			if( i2c1_error > 0) goto stop;
 		}
 		// read the data byte
 		*data = I2C1->DR;
 		// wait until the STOP condition has been sent
 		// check for an error to prevent getting stuck in the loop
-		t1 = sysTick_Time;
+		t1 = HAL_GetTick();
 		while( I2C1->CR1 & I2C_CR1_STOP){
 			i2c1_error = i2c1_check_error();
-			if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+			if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 			if( i2c1_error > 0) goto stop;
 		}
 		// acknowledge returned (to be ready for another reception)
@@ -149,10 +148,10 @@ uint8_t i2c_read( uint8_t slave_address, uint8_t* data, uint8_t N ){
 		__enable_irq();
 		// wait until a new byte is received (including ACK pulse) and DR has not been read yet
 		// check for an error to prevent getting stuck in the loop
-		t1 = sysTick_Time;
+		t1 = HAL_GetTick();
 		while( !(I2C1->SR1 & I2C_SR1_BTF) ){
 			i2c1_error = i2c1_check_error();
-			if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+			if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 			if( i2c1_error > 0) goto stop;
 		}
 		__disable_irq();
@@ -166,10 +165,10 @@ uint8_t i2c_read( uint8_t slave_address, uint8_t* data, uint8_t N ){
 		*data = I2C1->DR;
 		// wait until the STOP condition has been sent
 		// check for an error to prevent getting stuck in the loop
-		t1 = sysTick_Time;
+		t1 = HAL_GetTick();
 		while( I2C1->CR1 & I2C_CR1_STOP){
 			i2c1_error = i2c1_check_error();
-			if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+			if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 			if( i2c1_error > 0) goto stop;
 		}
 		// ACK bit controls the (N)ACK of the current byte being received in the shift register (default)
@@ -183,10 +182,10 @@ uint8_t i2c_read( uint8_t slave_address, uint8_t* data, uint8_t N ){
 		while(N>=3){
 			// wait until a new byte is received (including ACK pulse) and DR has not been read yet
 			// check for an error to prevent getting stuck in the loop
-			t1 = sysTick_Time;
+			t1 = HAL_GetTick();
 			while( !(I2C1->SR1 & I2C_SR1_BTF) ){
 				i2c1_error = i2c1_check_error();
-				if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+				if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 				if( i2c1_error > 0) goto stop;
 			}
 			// read one byte
@@ -197,10 +196,10 @@ uint8_t i2c_read( uint8_t slave_address, uint8_t* data, uint8_t N ){
 		}
 		// wait until a new byte is received (including ACK pulse) and DR has not been read yet
 		// check for an error to prevent getting stuck in the loop
-		t1 = sysTick_Time;
+		t1 = HAL_GetTick();
 		while( !(I2C1->SR1 & I2C_SR1_BTF) ){
 			i2c1_error = i2c1_check_error();
-			if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+			if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 			if( i2c1_error > 0) goto stop;
 		}
 		// no acknowledge returned
@@ -214,19 +213,19 @@ uint8_t i2c_read( uint8_t slave_address, uint8_t* data, uint8_t N ){
 		__enable_irq();
 		// wait until data receive register not empty
 		// check for an error to prevent getting stuck in the loop
-		t1 = sysTick_Time;
+		t1 = HAL_GetTick();
 		while( !(I2C1->SR1 & I2C_SR1_RXNE) ){
 			i2c1_error = i2c1_check_error();
-			if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+			if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 			if( i2c1_error > 0) goto stop;
 		}
 		// read the last byte
 		*data = I2C1->DR;
 		// wait until the STOP condition has been sent
-		t1 = sysTick_Time;
+		t1 = HAL_GetTick();
 		while( I2C1->CR1 & I2C_CR1_STOP){
 			i2c1_error = i2c1_check_error();
-			if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+			if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 			if( i2c1_error > 0) break;
 		}
 		// acknowledge returned (to be ready for another reception)
@@ -237,10 +236,10 @@ stop:
 	// send STOP condition
 	I2C1->CR1 |= I2C_CR1_STOP;
 	// wait until STOP condition has been generated
-	t1 = sysTick_Time;
+	t1 = HAL_GetTick();
 	while( I2C1->CR1 & I2C_CR1_STOP){
 		i2c1_error = i2c1_check_error();
-		if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+		if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 		if( i2c1_error > 0) break;
 	}
 	return i2c1_error;
@@ -255,20 +254,20 @@ uint8_t i2c_write( uint8_t slave_address, uint8_t* data, uint8_t N ){
 	I2C1->CR1 |= I2C_CR1_START;
 	// wait until START has been sent
 	// check for an error to prevent getting stuck in the loop
-	uint32_t t1 = sysTick_Time;
+	uint32_t t1 = HAL_GetTick();
 	while( !(I2C1->SR1 & I2C_SR1_SB) ){
 		i2c1_error = i2c1_check_error();
-		if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+		if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 		if( i2c1_error > 0) goto stop;
 	}
 	// send slave address + R/W bit (0 for write)
 	I2C1->DR = (slave_address << 1) | 0;
 	// wait until slave address has been sent
 	// check for an error to prevent getting stuck in the loop
-	t1 = sysTick_Time;
+	t1 = HAL_GetTick();
 	while( !(I2C1->SR1 & I2C_SR1_ADDR) ){
 		i2c1_error = i2c1_check_error();
-		if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+		if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 		if( i2c1_error > 0) goto stop;
 	}
 	// dummy readout of the SR1 and SR2 registers to clear the ADDR flag
@@ -280,10 +279,10 @@ uint8_t i2c_write( uint8_t slave_address, uint8_t* data, uint8_t N ){
 		I2C1->DR = *data;
 		// wait until data byte transfer succeeded
 		// check for an error to prevent getting stuck in the loop
-		t1 = sysTick_Time;
+		t1 = HAL_GetTick();
 		while( !(I2C1->SR1 & I2C_SR1_BTF) ){
 			i2c1_error = i2c1_check_error();
-			if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+			if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 			if( i2c1_error > 0) goto stop;
 		}
 		++data;
@@ -293,10 +292,10 @@ stop:
 	// send STOP condition
 	I2C1->CR1 |= I2C_CR1_STOP;
 	// wait until STOP condition has been generated
-	t1 = sysTick_Time;
+	t1 = HAL_GetTick();
 	while( I2C1->CR1 & I2C_CR1_STOP){
 		i2c1_error = i2c1_check_error();
-		if( (sysTick_Time - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
+		if( (HAL_GetTick() - t1) > 10 ) i2c1_error |= I2C_TIMEOUT_GENERAL;
 		if( i2c1_error > 0) break;
 	}
 	return i2c1_error;

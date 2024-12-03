@@ -27,6 +27,8 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal_conf.h"
+#include "stm32f1xx_hal_gpio.h"
+#include "stm32f1xx_hal_tim.h"
 
 /** @addtogroup STM32F1xx_HAL_Driver
   * @{
