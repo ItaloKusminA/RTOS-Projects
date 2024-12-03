@@ -4,146 +4,78 @@
 #include "miros.h"
 #include "stm32f1xx_hal.h"
 
+//em milis
+#define CTRL_PERIOD 100
+#define CTRL_DEADLINE 100
+#define CTRL_WCCT 50
 
-//Em millis
-#define SENS_PERIOD 100
-#define SENS_DEADLINE 100
-#define SENS_WCCT 50
+#define PID_PERIOD 50
+#define PID_DEADLINE 50
+#define PID_WCCT 10
 
-#define CTRL_PERIOD 500
-#define CTRL_DEADLINE 500
-#define CTRL_WCCT 100
+#define CH_WCCT 30
 
-#define DIAG_WCCT 30
-
+static struct VL53L0X myTOFsensor = {.io_2v8 = true, .address = 0b0101001, .io_timeout = 500, .did_timeout = false};
+uint16_t measured_value = 0;
 
 typedef struct{
     OSThread taskT;
     uint32_t stackT[40];
 } tasks_t;
 
-periodicParameters TSPP;
-aperiodicParameters TSAP;
-periodicParameters TCPP;
-aperiodicParameters TCAP;
-aperiodicParameters TDAP;
-periodicParameters TDPP;
+periodicParameters CTRLPP;
+aperiodicParameters CTRLAP;
+periodicParameters PIDPP;
+aperiodicParameters PIDAP;
+periodicParameters CHPP;
+aperiodicParameters CHAP;
 
-tasks_t taskSensoring;
-tasks_t taskControl;
-tasks_t taskDiagnostics;
+tasks_t taskPID;
+tasks_t taskCTRL;
+tasks_t taskCH;
 
-semaphore_t criticalRegionA;
-semaphore_t criticalRegionB;
-semaphore_t criticalRegionC;
+int setPoint = 500; //mm
+int error = 0;
+double errorIntegral = 0.0;
+double errorDerivative = 0.0;
+double previousError = 0.0;
+uint32_t currentTick = 0;
+const double Kp = -0.0001;
+const double Ki = -0.00001;
+const double Kd = -0.00001;
+const double engineeringAdjust = 0.61; // % de dutyCycle
+double pid = 0.0;
+double dutyCycle = 0.0;
 
 
-volatile int crankshaftPosition;
-volatile int massAirFlow;
-volatile int engineTemperature;
-volatile int oxygenSensor;
-volatile int iteration = 0;
-volatile int a = 0;
-volatile int b = 0;
-volatile int c = 0;
-
-float executionTimeAverage;
-
-int readCrankshaftPosition() {
-    return rand() % 360;
-}
-
-int readMassAirFlow() {
-    return rand() % 100;
-}
-
-int readEngineTemperature() {
-    return rand() % 120;
-}
-
-int readOxygenSensor() {
-    return rand() % 100;
-}
-
-int calculateInjectionTime(int crankshaftPosition, int massAirFlow) {
-    // Illustrative function
-    return crankshaftPosition * massAirFlow;
-}
-
-int calculateIgnitionAdvance(int crankshaftPosition, int engineTemperature) {
-    // Illustrative function
-    return crankshaftPosition * engineTemperature;
-}
-
-void controlInjectors(int injectionTime) {
-    // Illustrative function
-}
-
-void controlIgnitionSystem(int ignitionAdvance) {
-    // Illustrative function
-}
-
-void monitorSensors() {
-    // Illustrative function
-}
-
-void monitorActuators() {
-    // Illustrative function
-}
-
-void detectFaults() {
-    // Illustrative function
-}
-
-void TaskSensoring() {
+void TaskPID() {
     while (1) {
-    	semaphore_wait(&criticalRegionA);
-        //int start_tick = HAL_GetTick();
-        crankshaftPosition = readCrankshaftPosition();
-        massAirFlow = readMassAirFlow();
-        engineTemperature = readEngineTemperature();
-        oxygenSensor = readOxygenSensor();
-        a++;
-        //int ending_tick = HAL_GetTick();
-        //int execution_time = ending_tick - start_tick;
-        //iteration++;
-        //executionTimeAverage = ((executionTimeAverage * (iteration - 1)) + execution_time) / iteration;
-        semaphore_post(&criticalRegionA);
+    	//Ler o sensor com I2C
+    	measuredValue = VL53L0X_readRangeContinuousMillimeters(&myTOFsensor);
+    	//Calcula o erro
+    	dt = ((HAL_GetTick() - currentTick)/1000);
+    	error = setPoint - measuredValue;
+    	errorIntegral += error*dt;
+    	errorDerivative = (error - previousError)/dt;
+    	previousError = error;
+    	currentTick = HAL_GetTick();
+    	//Calcula PID
+    	pid = Kp*error + Ki*errorIntegral + Kd*errorDerivative;
         OS_waitNextPeriod();
     }
 }
 
-void TaskControl() {
+void TaskCTRL() {
     while (1) {
-    	semaphore_wait(&criticalRegionB);
-        //int start_tick = HAL_GetTick();
-        int injectionTime = calculateInjectionTime(crankshaftPosition, massAirFlow);
-        int ignitionAdvance = calculateIgnitionAdvance(crankshaftPosition, engineTemperature);
-        controlInjectors(injectionTime);
-        controlIgnitionSystem(ignitionAdvance);
-        b++;
-        //int ending_tick = HAL_GetTick();
-        //int execution_time = ending_tick - start_tick;
-        //iteration++;
-        //executionTimeAverage = ((executionTimeAverage * (iteration - 1)) + execution_time) / iteration;
-        semaphore_post(&criticalRegionB);
+    	//Altera o PWM baseado no Kp, Ki e Kd
         OS_waitNextPeriod();
     }
 }
 
-void TaskDiagnostics() {
+void TaskCH() {
     while (1) {
-        //int start_tick = HAL_GetTick();
-    	semaphore_wait(&criticalRegionC);
-        monitorSensors();
-        monitorActuators();
-        detectFaults();
-        c++;
-        //int ending_tick = HAL_GetTick();
-        //int execution_time = ending_tick - start_tick;
-        //iteration++;
-        //executionTimeAverage = ((executionTimeAverage * (iteration - 1)) + execution_time) / iteration;
-        semaphore_post(&criticalRegionC);
+    	//chamada pelo interrupt, altera o setpoint
+    	setPoint = 300;
         OS_waitNextOccurence();
     }
 }
@@ -153,53 +85,55 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	uint32_t currentTick = HAL_GetTick();
 	if (GPIO_Pin == GPIO_PIN_0 && (currentTick - previousTick) > 20){
 		previousTick = currentTick;
-		OS_TBS(&taskDiagnostics.taskT);
+		OS_TBS(&taskCH.taskT);
 		iteration++;
 	}
 }
 
 static void MX_GPIO_Init(void);
+static void MX_I2C1_Init(void);
 
 int main() {
 	HAL_Init();
 	MX_GPIO_Init();
 
-	taskSensoring.taskT.PP = &TSPP;
-	taskSensoring.taskT.AP = &TSAP;
-	taskControl.taskT.PP = &TCPP;
-	taskControl.taskT.AP = &TCAP;
-	taskDiagnostics.taskT.PP = &TDPP;
-	taskDiagnostics.taskT.AP = &TDAP;
-	//aperiodicHandler.taskT.PP = &AHPP;
-	semaphore_init(&criticalRegionA, 1);
-	semaphore_init(&criticalRegionB, 1);
-	semaphore_init(&criticalRegionC, 1);
+	// Configure VL53L0X
+	// usart_init(USART1, rcc_get_clock() / 115200);
+	VL53L0X_init(&myTOFsensor);
+	VL53L0X_setMeasurementTimingBudget(&myTOFsensor, 20e3); // 20 ms
+	VL53L0X_startContinuous(&myTOFsensor, 0);
 
     srand(time(NULL));
 
     OS_init();
 
+    taskPID.taskT.PP = &PIDPP;
+    taskPID.taskT.AP = &PIDAP;
     OSThread_start(
-        &taskSensoring.taskT,
+        &taskPID.taskT,
         SENS_DEADLINE,
         SENS_PERIOD,
-        &TaskSensoring,
-        &taskSensoring.stackT, sizeof(taskSensoring.stackT));
+        &TaskPID,
+        &taskPID.stackT, sizeof(taskPID.stackT));
 
+	taskCTRL.taskT.PP = &CTRLPP;
+	taskCTRL.taskT.AP = &CTRLAP;
     OSThread_start(
-        &taskControl.taskT,
+        &taskCTRL.taskT,
         CTRL_DEADLINE,
         CTRL_PERIOD,
-        &TaskControl,
-        &taskControl.stackT, sizeof(taskControl.stackT));
+        &TaskCTRL,
+        &taskCTRL.stackT, sizeof(taskCTRL.stackT));
 
+    taskCH.taskT.PP = &CHPP;
+    taskCH.taskT.AP = &CHAP;
     OSAperiodic_thread_start(
-        &taskDiagnostics.taskT,
-        DIAG_WCCT,
-        &TaskDiagnostics,
-        &taskDiagnostics.stackT, sizeof(taskDiagnostics.stackT));
+        &taskCH.taskT,
+        CH_WCCT,
+        &TaskCH,
+        &taskCH.stackT, sizeof(taskCH.stackT));
 
-    double Up = ((double)SENS_WCCT / (double)SENS_PERIOD) +
+    double Up = ((double)PID_WCCT / (double)PID_PERIOD) +
     			//((double)APH_WCCT / (double)APH_PERIOD) +
                 ((double)CTRL_WCCT / (double)CTRL_PERIOD);
 
@@ -225,3 +159,4 @@ static void MX_GPIO_Init(void)
   HAL_NVIC_SetPriority(EXTI0_IRQn, 0U, 0U);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 }
+

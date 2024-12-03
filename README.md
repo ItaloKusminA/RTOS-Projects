@@ -70,7 +70,7 @@ $$ U_{total} = U_{SENS} + U_{CTRL} = 0.25 + 0.20 = 0.45 $$
 
 Since the total utilization for periodic tasks is 0.45, which is less than 1, these periodic tasks are schedulable under the EDF algorithm.
 
-### Schedulability of Aperiodic Task (DIAG)
+### Schedulability of Aperiodic Task 
 
 For aperiodic tasks, schedulability depends on the available slack time in the schedule of periodic tasks. The task `DIAG` has an execution time of 30 ms. Since the utilization of the periodic tasks is 0.45, there is remaining utilization available for aperiodic tasks:
 
