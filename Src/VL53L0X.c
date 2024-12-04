@@ -6,7 +6,8 @@
 #include "VL53L0X.h"
 
 // Defines /////////////////////////////////////////////////////////////////////
-#include "i2c.h"
+#include "stm32.h"
+
 // Record the current time to check an upcoming timeout against
 //#define startTimeout() (timeout_start_ms = millis())
 
@@ -46,6 +47,7 @@ void VL53L0X_setAddress(struct VL53L0X* dev, uint8_t new_addr)
 bool VL53L0X_init(struct VL53L0X* dev)
 {
   // VL53L0X_DataInit() begin
+  i2c_init(I2C1);
 
   // sensor uses 1V8 mode for I/O by default; switch to 2V8 mode if necessary
   if (dev->io_2v8)
@@ -68,7 +70,7 @@ bool VL53L0X_init(struct VL53L0X* dev)
   VL53L0X_writeReg(dev, MSRC_CONFIG_CONTROL, VL53L0X_readReg(dev,  MSRC_CONFIG_CONTROL) | 0x12);
 
   // set final range signal rate limit to 0.25 MCPS (million counts per second)
-  VL53L0X_setSignalRateLimit(dev, 0.25);
+  VL53L0X_setSignalRateLimit(dev);
 
   VL53L0X_writeReg(dev, SYSTEM_SEQUENCE_CONFIG, 0xFF);
 
@@ -269,7 +271,7 @@ void VL53L0X_writeReg(struct VL53L0X* dev, uint8_t reg, uint8_t value)
 	uint8_t buf[2];
 	buf[0] = reg;
 	buf[1] = value;
-	dev->last_status = i2c_write(dev->address, buf, 2);
+	i2c_write(I2C1, 0b0101001, buf, 2);
 }
 
 // Write a 16-bit register
@@ -279,7 +281,7 @@ void VL53L0X_writeReg16Bit(struct VL53L0X* dev, uint8_t reg, uint16_t value)
 	buf[0] = reg;
 	buf[1] = (uint8_t) (value >> 8);
 	buf[2] = (uint8_t) (value & 0xFF);
-	dev->last_status = i2c_write(dev->address, buf, 3);
+	i2c_write(I2C1, 0b0101001, buf, 3);
 }
 
 // Write a 32-bit register
@@ -291,15 +293,15 @@ void VL53L0X_writeReg32Bit(struct VL53L0X* dev, uint8_t reg, uint32_t value)
 	buf[2] = (uint8_t) (value >> 16);
 	buf[3] = (uint8_t) (value >> 8);
 	buf[4] = (uint8_t) (value & 0xFF);
-	dev->last_status = i2c_write(dev->address, buf, 5);
+	i2c_write(I2C1, 0b0101001, buf, 5);
 }
 
 // Read an 8-bit register
 uint8_t VL53L0X_readReg(struct VL53L0X* dev, uint8_t reg)
 {
   uint8_t value;
-  i2c_write(dev->address, &reg, 1);
-  dev->last_status = i2c_read(dev->address, &value, 1);
+  i2c_write(I2C1, 0b0101001, &reg, 1);
+  i2c_read(I2C1, 0b0101001, &value, 1);
   return value;
 }
 
@@ -308,9 +310,9 @@ uint16_t VL53L0X_readReg16Bit(struct VL53L0X* dev, uint8_t reg)
 {
   uint16_t value;
   uint8_t buf[2];
-  i2c_write(dev->address, &reg, 1);
-  dev->last_status = i2c_read(dev->address, buf, 2);
-  value = (uint16_t) ( buf[0] << 8 );
+  i2c_write(I2C1, 0b0101001, &reg, 1);
+  i2c_read(I2C1, 0b0101001, buf, 2);
+  value = (uint16_t) (buf[0] << 8);
   value |= (uint16_t) buf[1];
   return value;
 }
@@ -320,8 +322,8 @@ uint32_t VL53L0X_readReg32Bit(struct VL53L0X* dev, uint8_t reg)
 {
   uint32_t value;
   uint8_t buf[4];
-  i2c_write(dev->address, &reg, 1);
-  dev->last_status = i2c_read(dev->address, buf, 4);
+  i2c_write(I2C1, 0b0101001, &reg, 1);
+  i2c_read(I2C1, 0b0101001, buf, 4);
   value = (uint32_t) ( buf[0] << 24 );
   value |= (uint32_t) ( buf[1] << 16 );
   value |= (uint32_t) ( buf[2] << 8 );
@@ -333,16 +335,16 @@ uint32_t VL53L0X_readReg32Bit(struct VL53L0X* dev, uint8_t reg)
 // starting at the given register
 void VL53L0X_writeMulti(struct VL53L0X* dev, uint8_t reg, uint8_t* src, uint8_t count)
 {
-	i2c_write(dev->address, &reg, 1);
-	dev->last_status = i2c_write(dev->address, src, count);
+	i2c_write(I2C1, 0b0101001, &reg, 1);
+	i2c_write(I2C1, 0b0101001, src, count);
 }
 
 // Read an arbitrary number of bytes from the sensor, starting at the given
 // register, into the given array
 void VL53L0X_readMulti(struct VL53L0X* dev, uint8_t reg, uint8_t * dst, uint8_t count)
 {
-	i2c_write(dev->address, &reg, 1);
-	dev->last_status = i2c_read(dev->address, dst, count);
+	i2c_write(I2C1, 0b0101001, &reg, 1);
+	i2c_read(I2C1, 0b0101001, dst, count);
 }
 
 // Set the return signal rate limit check value in units of MCPS (mega counts
@@ -353,19 +355,17 @@ void VL53L0X_readMulti(struct VL53L0X* dev, uint8_t reg, uint8_t * dst, uint8_t 
 // seems to increase the likelihood of getting an inaccurate reading because of
 // unwanted reflections from objects other than the intended target.
 // Defaults to 0.25 MCPS as initialized by the ST API and this library.
-bool VL53L0X_setSignalRateLimit(struct VL53L0X* dev, float limit_Mcps)
+bool VL53L0X_setSignalRateLimit(struct VL53L0X* dev)
 {
-  if (limit_Mcps < 0 || limit_Mcps > 511.99) { return false; }
-
   // Q9.7 fixed point format (9 integer bits, 7 fractional bits)
-  VL53L0X_writeReg16Bit(dev, FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, limit_Mcps * (1 << 7));
+  VL53L0X_writeReg16Bit(dev, FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, (1 << 7) / 4);
   return true;
 }
 
 // Get the return signal rate limit check value in MCPS
-float VL53L0X_getSignalRateLimit(struct VL53L0X* dev)
+uint16_t VL53L0X_getSignalRateLimit(struct VL53L0X* dev)
 {
-  return (float)VL53L0X_readReg16Bit(dev, FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT) / (1 << 7);
+  return VL53L0X_readReg16Bit(dev, FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT) * 4 / (1 << 7);
 }
 
 // Set the measurement timing budget in microseconds, which is the time allowed
@@ -759,15 +759,15 @@ void VL53L0X_stopContinuous(struct VL53L0X* dev)
 // single-shot range measurement)
 uint16_t VL53L0X_readRangeContinuousMillimeters(struct VL53L0X* dev)
 {
-  VL53L0X_startTimeout(dev);
-  while ((VL53L0X_readReg(dev,  RESULT_INTERRUPT_STATUS) & 0x07) == 0)
-  {
-    if (VL53L0X_checkTimeoutExpired(dev))
-    {
-      dev->did_timeout = true;
-      return 65535;
-    }
-  }
+  // VL53L0X_startTimeout(dev);
+  // while ((VL53L0X_readReg(dev,  RESULT_INTERRUPT_STATUS) & 0x07) == 0)
+  // {
+  //   if (VL53L0X_checkTimeoutExpired(dev))
+  //   {
+  //     dev->did_timeout = true;
+  //     return 65535;
+  //   }
+  // }
 
   // assumptions: Linearity Corrective Gain is 1000 (default);
   // fractional ranging is not enabled
@@ -974,9 +974,9 @@ bool VL53L0X_performSingleRefCalibration(struct VL53L0X* dev, uint8_t vhv_init_b
 
 
 void VL53L0X_startTimeout(struct VL53L0X* dev){
-	dev->timeout_start_ms = HAL_GetTick();
+	//dev->timeout_start_ms = os_current_millis();
 }
 
 bool VL53L0X_checkTimeoutExpired(struct VL53L0X* dev){
-	return (dev->io_timeout > 0 && (HAL_GetTick() - dev->timeout_start_ms) > dev->io_timeout);
+	return 0;//(dev->io_timeout > 0 && (os_current_millis() - dev->timeout_start_ms) > dev->io_timeout);
 }

@@ -56,13 +56,11 @@ bool firstAperiodicOccurence = true;
 double Us; //Server utilization
 
 OSThread idleThread;
-uint32_t stack_idleThread[40];
+uint32_t stack_idleThread[256];
 periodicParameters ITP;
 aperiodicParameters ITAP;
 
-bool idle = true;
 void main_idleThread() {
-	idle = false;
     while (1) {
         OS_onIdle();
     }
@@ -218,6 +216,11 @@ void OS_tick(void) {
     }
 }
 
+void OS_error(void){
+	while (1){
+
+	}
+}
 void OS_delay(uint32_t ticks) {
     __asm volatile ("cpsid i");
     /* never call OS_delay from the idleThread */
@@ -227,7 +230,9 @@ void OS_delay(uint32_t ticks) {
     	OS_PreadyIndex[OS_curr->index] = 0;
     if(!OS_curr->PP)
         OS_APreadyIndex[OS_curr->index] = 0;
+    __disable_irq();
     OS_sched();
+    __enable_irq();
     __asm volatile ("cpsie i");
 }
 
@@ -257,17 +262,35 @@ void OS_TBS(OSThread *occurenceTask){
 void OS_waitNextOccurence(void){
 	OS_APreadyIndex[OS_curr->index] = 0;
 	OS_APThread[OS_curr->index]->AP->deadline = UINT32_MAX;
-	if(OS_AperiodicTaskAvailable())
+	if(OS_AperiodicTaskAvailable()){
 		next = OS_APThread[OS_EarliestAperiodicDeadline()];
-	else next = OS_PThread[OS_EarliestPeriodicDeadline()];
-	OS_sched();
+		if (OS_PThread[OS_EarliestPeriodicDeadline()]->PP->deadline < next->AP->deadline){
+			next = OS_PThread[OS_EarliestPeriodicDeadline()];
+		}
+	}
+	else{
+		next = OS_PThread[OS_EarliestPeriodicDeadline()];
+	}
+    __disable_irq();
+    OS_sched();
+    __enable_irq();
 }
 
 void OS_waitNextPeriod(void){
 	OS_PreadyIndex[OS_curr->index] = 0;
 	OS_curr->timeout = OS_curr->PP->period;
-	next = OS_PThread[OS_EarliestPeriodicDeadline()];
-	OS_sched();
+	if(OS_AperiodicTaskAvailable()){
+		next = OS_APThread[OS_EarliestAperiodicDeadline()];
+		if (OS_PThread[OS_EarliestPeriodicDeadline()]->PP->deadline < next->AP->deadline){
+			next = OS_PThread[OS_EarliestPeriodicDeadline()];
+		}
+	}
+	else{
+		next = OS_PThread[OS_EarliestPeriodicDeadline()];
+	}
+    __disable_irq();
+    OS_sched();
+    __enable_irq();
 }
 
 void OSAperiodic_thread_start(

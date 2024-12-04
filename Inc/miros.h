@@ -79,6 +79,8 @@ uint32_t OS_EarliestAperiodicDeadline(void);
 
 uint32_t OS_EarliestPeriodicDeadline(void);
 
+void OS_error(void);
+
 /* blocking delay */
 void OS_delay(uint32_t ticks);
 
