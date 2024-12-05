@@ -5,37 +5,20 @@
 #include "miros.h"
 #include "stm32f1xx_hal.h"
 
-/*
-Conections:
+//millis
+#define A_PERIOD 50
+#define A_DEADLINE 50
+#define A_WCCT 5
 
-button: B0
+#define B_PERIOD 50
+#define B_DEADLINE 50
+#define B_WCCT 25
 
-PWM : A0
+#define C_PERIOD 50
+#define C_DEADLINE 50
+#define C_WCCT 10
 
-Sensor de distância:
-    SCL: B6
-    SDA: B7
-
-*/
-
-//em milis
-#define CTRL_PERIOD 300
-#define CTRL_DEADLINE 300
-#define CTRL_WCCT 10
-
-#define PID_PERIOD 200
-#define PID_DEADLINE 200
-#define PID_WCCT 10
-
-#define READ_PERIOD 50
-#define READ_DEADLINE 50
-#define READ_WCCT 10
-
-#define CH_WCCT 10
-
-static struct VL53L0X myTOFsensor = {.io_2v8 = false, .address = 0x29, .io_timeout = 500, .did_timeout = false};
-int measuredValue = 0;
-TIM_HandleTypeDef htim2;
+#define D_WCCT 5
 
 
 typedef struct{
@@ -43,165 +26,156 @@ typedef struct{
     uint32_t stackT[256];
 } tasks_t;
 
-periodicParameters CTRLPP;
-aperiodicParameters CTRLAP;
-periodicParameters PIDPP;
-aperiodicParameters PIDAP;
-periodicParameters READPP;
-aperiodicParameters READAP;
-periodicParameters CHPP;
-aperiodicParameters CHAP;
-
-tasks_t taskPID;
-tasks_t taskCTRL;
-tasks_t taskCH;
-tasks_t taskREAD;
-
 semaphore_t A;
 semaphore_t B;
 semaphore_t C;
 semaphore_t D;
 
-int setPoint = 400; //mm
-int error = 0;
-double errorIntegral = 0.0;
-double errorDerivative = 0.0;
-int previousError = 0;
-uint32_t currentTick = 0;
-const double Kp = -0.0001;
-const double Ki = -0.00001;
-const double Kd = -0.00001;
-const double engineeringAdjust = 0.61; // % de dutyCycle
-const uint16_t period = 1000;
-double pid = 0.0;
-double dutyCycle = 0.0;
+// Initialization of periodic and aperiodic structs of each task
+periodicParameters APP;
+aperiodicParameters AAP;
+periodicParameters BPP;
+aperiodicParameters BAP;
+periodicParameters CPP;
+aperiodicParameters CAP;
+periodicParameters DPP;
+aperiodicParameters DAP;
 
-int cont = 0;
-void TaskREAD() {
+// Tasks intialization
+tasks_t taskA;
+tasks_t taskB;
+tasks_t taskC;
+tasks_t taskD;
+
+
+uint32_t currentTick = 0;
+
+void TaskA() {
     while (1) {
-    	//Ler o sensor com I2C
     	semaphore_wait(&A);
-    	cont++;
-    	measuredValue = (int)VL53L0X_readRangeContinuousMillimeters(&myTOFsensor);
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+    	currentTick = HAL_GetTick();
+    	while(HAL_GetTick() - currentTick <= A_WCCT){
+
+    	}
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
     	semaphore_post(&A);
-    	//Calcula o erro
     	OS_waitNextPeriod();
     }
 }
 
-void TaskPID(){
+void TaskB(){
 	while(1){
 		semaphore_wait(&B);
-		float dt = (float)((HAL_GetTick() - currentTick)/1000);
-		error = setPoint - measuredValue;
-		errorIntegral += (float)(error*dt);
-		errorDerivative = (float)((error - previousError)/dt);
-		previousError = error;
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_SET);
 		currentTick = HAL_GetTick();
-		//Calcula PID
-		pid = (float)(Kp*error + Ki*errorIntegral + Kd*errorDerivative);
-		if (pid >= 0.3) pid = 0.3;
-		if (pid <= -0.3) pid = -0.3;
+		while(HAL_GetTick() - currentTick <= B_WCCT){
+
+		}
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, GPIO_PIN_RESET);
 		semaphore_post(&B);
 		OS_waitNextPeriod();
 	}
 }
-void setPWM()
-{
-	TIM2->CCR1 = (int)((pid + 0.61)*TIM2->ARR);
-}
 
-void TaskCTRL() {
+void TaskC() {
     while (1) {
     	semaphore_wait(&C);
-    	setPWM();
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
+    	currentTick = HAL_GetTick();
+		while(HAL_GetTick() - currentTick <= C_WCCT){
+
+		}
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
     	semaphore_post(&C);
         OS_waitNextPeriod();
     }
 }
-
-void TaskCH() {
+int cont = 0;
+void TaskD() {
     while (1) {
-    	//chamada pelo interrupt, altera o setpoint
     	semaphore_wait(&D);
-    	if(setPoint == 400) setPoint = 200;
-    	else setPoint = 400;
-    	semaphore_post(&D);
+    	cont = 0;
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+    	currentTick = HAL_GetTick();
+		while(HAL_GetTick() - currentTick <= D_WCCT){
+
+		}
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+		cont = 1;
+		semaphore_post(&D);
         OS_waitNextOccurence();
     }
 }
-volatile uint32_t previousTick = 0;
+
+volatile uint32_t cTick = 0;
+volatile uint32_t pTick = 0;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	uint32_t currentTick = HAL_GetTick();
-	if (GPIO_Pin == GPIO_PIN_0 && (currentTick - previousTick) > 20){
-		previousTick = currentTick;
-		OS_TBS(&taskCH.taskT);
+	uint32_t cTick = HAL_GetTick();
+	if (GPIO_Pin == GPIO_PIN_0 && (cTick - pTick) > 20){
+		pTick = cTick;
+		OS_TBS(&taskD.taskT);
 	}
 }
 
 static void MX_GPIO_Init(void);
-void MX_TIM2_Init(void);
-//void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 int main() {
 	HAL_Init();
-	MX_TIM2_Init();
 	MX_GPIO_Init();
 	semaphore_init(&A, 1);
 	semaphore_init(&B, 1);
 	semaphore_init(&C, 1);
 	semaphore_init(&D, 1);
 
-	// Configure VL53L0X
-	// usart_init(USART1, rcc_get_clock() / 115200);
-	while(!VL53L0X_init(&myTOFsensor));
-	VL53L0X_setMeasurementTimingBudget(&myTOFsensor, 20e3); // 20 ms
-	VL53L0X_startContinuous(&myTOFsensor, 0);
-
     srand(time(NULL));
 
     OS_init();
 
-    taskPID.taskT.PP = &PIDPP;
-    taskPID.taskT.AP = &PIDAP;
-    OSThread_start(
-        &taskPID.taskT,
-        PID_DEADLINE,
-        PID_PERIOD,
-        &TaskPID,
-        &taskPID.stackT, sizeof(taskPID.stackT));
 
-    taskREAD.taskT.PP = &READPP;
-	taskREAD.taskT.AP = &READAP;
+    taskA.taskT.PP = &APP;
+    taskA.taskT.AP = &AAP;
+    OSThread_start(
+        &taskA.taskT,
+        A_DEADLINE,
+        A_PERIOD,
+        &TaskA,
+        &taskA.stackT, sizeof(taskA.stackT));
+
+    taskB.taskT.PP = &BPP;
+	taskB.taskT.AP = &BAP;
 	OSThread_start(
-		&taskREAD.taskT,
-		READ_DEADLINE,
-		READ_PERIOD,
-		&TaskREAD,
-		&taskREAD.stackT, sizeof(taskREAD.stackT));
+		&taskB.taskT,
+		B_DEADLINE,
+		B_PERIOD,
+		&TaskB,
+		&taskB.stackT, sizeof(taskB.stackT));
 
-	taskCTRL.taskT.PP = &CTRLPP;
-	taskCTRL.taskT.AP = &CTRLAP;
+	taskC.taskT.PP = &CPP;
+	taskC.taskT.AP = &CAP;
     OSThread_start(
-        &taskCTRL.taskT,
-        CTRL_DEADLINE,
-        CTRL_PERIOD,
-        &TaskCTRL,
-        &taskCTRL.stackT, sizeof(taskCTRL.stackT));
+        &taskC.taskT,
+        C_DEADLINE,
+        C_PERIOD,
+        &TaskC,
+        &taskC.stackT, sizeof(taskC.stackT));
 
-    taskCH.taskT.PP = &CHPP;
-    taskCH.taskT.AP = &CHAP;
+    taskD.taskT.PP = &DPP;
+    taskD.taskT.AP = &DAP;
     OSAperiodic_thread_start(
-        &taskCH.taskT,
-        CH_WCCT,
-        &TaskCH,
-        &taskCH.stackT, sizeof(taskCH.stackT));
+        &taskD.taskT,
+        D_WCCT,
+        &TaskD,
+        &taskD.stackT, sizeof(taskD.stackT));
 
-    double Up = ((double)PID_WCCT / (double)PID_PERIOD) +
-    			((double)READ_WCCT / (double)READ_PERIOD) +
-                ((double)CTRL_WCCT / (double)CTRL_PERIOD);
-    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+    double Up = ((double)A_WCCT / (double)A_PERIOD) +
+    			((double)B_WCCT / (double)A_PERIOD) +
+                ((double)C_WCCT / (double)C_PERIOD);
     OS_run(Up);
 
     return 0;
@@ -222,6 +196,15 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PA1 PA2 PA3 PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /**TIM2 GPIO Configuration
   PA0-WKUP     ------> TIM2_CH1
   */
@@ -234,50 +217,4 @@ static void MX_GPIO_Init(void)
   HAL_NVIC_SetPriority(EXTI0_IRQn, 0U, 0U);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 }
-
-/* TIM1 init function */
-/* TIM1 init function */
-
-void MX_TIM2_Init(void){
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
-
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 8-1;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = period;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-	  OS_error();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-	  OS_error();
-  }
-  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
-  {
-	  OS_error();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-	  OS_error();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0.5*period;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-	  OS_error();
-  }
-  //HAL_TIM_MspPostInit(&htim2);
-}
-
 
