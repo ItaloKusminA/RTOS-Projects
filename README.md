@@ -1,36 +1,17 @@
-# Total Bandwidth Server and Non-Preemptive Protocol Implementation on MirOS
+# PID Controller for the Height of a Ping Pong Ball on MiROS
 
-## Student Information
+## Students Information
 
-Name: Italo Miranda Kusmin Alves  
-Matriculation: 22101930
+Names: Gustavo Moro, Italo Miranda Kusmin Alves, Pedro Augusto Dantas Vargas
+Matriculations: 22101929, 22101930, 22103666.
 
-## Total Bandwidth Server Implementation
+## Utilized components
 
-To implement the Total Bandwidth Server (TBS), the first change was to modify the `OSThread` structure by adding two additional parameters: `aperiodicParameters` for aperiodic tasks, which store the computation time of each task, and `periodicParameters`, which store the relative deadline and relative period. The period and deadline are dynamically adjusted to select the task with the earliest deadline.
+## Periodic Tasks
 
-A new vector of structs, `OS_APThread`, was created to store the started aperiodic tasks. Additionally, `OS_APreadyIndex` was introduced to keep track of the aperiodic tasks that are ready to run.
+## Aperiodic Tasks
 
-Next, the `OSAperiodic_thread_start` function was implemented. Its purpose is similar to `OSThread_start`, but with a key difference: aperiodic tasks start with the ready index set to 0 (not ready to run). This function initializes the `aperiodicParameters` structure with the received computation time and sets the deadline to `UINT32_MAX`. In contrast, `OSThread_start` initializes the `periodicParameters` with the user-provided parameters.
-
-The TBS implementation is achieved using the `OS_TBS` function, which applies the TBS algorithm to set task deadlines and update the ready index to 1 (ready to run). The deadline is calculated as follows:
-
-$$
-D_i = \max(t_{current}, D_{last}) + \frac{C_i}{U_s}
-$$
-
-where  $D_i$ is the deadline, $t_{current}$ is the current time, $D_{last}$ is the last deadline, $C_i$ is the computation time, and $U_s$ is the server utilization. Essentially, the deadline assigned to the task is the sum of the current time (or the last deadline, whichever is greater) and the ratio of the task's computation time to the server utilization. The Earliest Deadline Scheduler then schedules the aperiodic task if its deadline is earlier than those of the periodic tasks. `OS_EarliestPeriodicDeadline` and `OS_EarliestAperiodicDeadline` were created to calculate and return the earliest periodic and aperiodic tasks, respectively. They are called in `OS_tick`, and the aperiodic task's earliest deadline is checked only when the server is active. This means that if the server has at least one task ready to run, it is identified by the function `OS_AperiodicTaskAvailable`.
-
-Finally, the `OS_waitNextOccurence` function was implemented, functioning similarly to `OS_waitNextPeriod`. It handles the end of a task's execution by resetting the deadline to `UINT32_MAX` and the ready index to 0 (not ready to run). When they are called, these functions calculate the next earliest deadline task and then call `OS_sched`.
-
-
-## Aperiodic Task Implementation
-
-An aperiodic task was implemented with the function `TaskDiagnostics`. It is activated when the PB0 pin receives an interruption, triggering the callback `HAL_GPIO_EXTI_Callback`, which then calls `OS_TBS`. In this process, the task is set to active and is scheduled when it has the earliest deadline, just like a normal task.
-
-## Non-Preemptive Protocol Implementation
-
-The non-preemptive protocol was implemented by adding a parameter `NPPprio` to the `OS_thread` structure. This parameter is set to the maximum value when a thread enters a critical region, preventing other threads from being scheduled. The thread keeps track of the critical regions it enters, ensuring that `NPPprio` is reset only when it exits the last critical region.
+## Critical regions
 
 ## Schedulability Analysis
 
@@ -86,31 +67,3 @@ Since the execution time of `DIAG` (30 ms) is less than the available slack time
 ### Conclusion
 
 The given periodic tasks (SENS and CTRL) are schedulable under the EDF algorithm as their total utilization is less than 1. The aperiodic task (DIAG) is also schedulable as its execution time fits within the available slack time of the periodic tasks.
-
-## Problems Solved with the STM32 BluePill
-
-Many of the STM32f1 series (Bluepill) have problems being recognized during the first use with the ST-LINK V2. To solve these problems, it was observed that using the STLink Utility, which can be found at this link: [STLink Utility](https://www.st.com/en/development-tools/stsw-link004.html), it is possible to resolve the issue by following these steps:
-
-1. Change both jumpers of the boot to the "1" position, accessing the RAM memory of the STM32.
-   
-   ### Boot Example
-   ![Boot example](./BOOTSTM.png)
-
-2. Connect to the target using the STLink Utility.
-   
-   ### Connect to Target
-   ![Connect to target](./Connect.png)
-
-3. Perform a full chip erase.
-   
-   ### Full Chip Erase
-   ![Full chip erase](./Erase.png)
-
-4. Finally, change the boot jumpers back to the "0" position and try to run your project again.
-
-If you encounter problems debugging your project, it can be resolved in two ways:
-- If your project doesn't have an `.ioc` file, you must uninstall and reinstall the STM32CubeIDE.
-- If your project has an `.ioc` file, go to "Pinout & Configuration," then "System Core," and change the "Debug" option to "Serial Wire."
-
-  ### System Core
-   ![SystemCore](./SystemCore.png)
