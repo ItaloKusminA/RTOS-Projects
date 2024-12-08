@@ -81,7 +81,7 @@ The schedulability analysis ensures that all tasks meet their deadlines, both pe
 
 ### Aperiodic Tasks
 
-| Task Name | Execution Time (ms) | Deadline (ms) |
+| Task Name | Worst Case Execution Time (ms) | Deadline (ms) |
 |-----------|----------------------|---------------|
 | CH        | 10                   | -             |
 
