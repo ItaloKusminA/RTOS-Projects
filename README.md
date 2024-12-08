@@ -35,6 +35,12 @@ There are four critical regions, protected by four semaphores using the Non-pree
 - `setPointSemaphore`: Protects the set point, shared by `TaskPID` and `TaskCH`.
 - `pidValueSemaphore`: Protects the PID value, shared by `TaskPID` and `TaskCTRL`.
 
+##Scheduler corrections
+
+On the attemption of implement a Event Viewer, utilizing a Logic Analyser and the Pulse View, it was possible to find some error on the scheduler logic, found on the `OS_waitNextOccurence` and `OS_waitNextPeriod`, which were affecting the correct working of the scheduler, principally when aperiodic tasks arrived on the server, theses functions were not verifying if there was more aperiodic tasks available on the server. Applying the corrections it was possible to validate the scheduler, by using three generic tasks, which keeps utilizes the `HAL_GetTick` to keep the tasks running for the exact time it were initializated for and utilizing the NPP to avoid the context change.
+
+
+
 ## Schedulability Analysis
 
 The schedulability analysis ensures that all tasks meet their deadlines, both periodic and aperiodic. The computation times were measured in the second project, with significant safety margins incorporated to guarantee task completion within deadlines even under varying load conditions. This is crucial because the computation time of each task is needed by the TBS to calculate deadlines.
