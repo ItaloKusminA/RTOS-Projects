@@ -34,7 +34,7 @@ There are four critical regions, protected by four semaphores using the Non-pree
 - `measuredValueSemaphore`: Protects sensor readings, shared by `TaskREAD` and `TaskPID`.
 - `setPointSemaphore`: Protects the set point, shared by `TaskPID` and `TaskCH`.
 - `pidValueSemaphore`: Protects the PID value, shared by `TaskPID` and `TaskCTRL`.
-- 
+  
 ### Scheduler Corrections
 
 In an attempt to implement an Event Viewer using a Logic Analyzer and Pulse View, some errors were found in the scheduler logic, specifically in the `OS_waitNextOccurrence` and `OS_waitNextPeriod` functions. These errors were affecting the correct functioning of the scheduler, particularly when aperiodic tasks arrived at the server. These functions were not checking if more aperiodic tasks were available on the server. After applying the corrections, it was possible to validate the scheduler by using three generic periodic tasks and one aperiodic task with the same parameters as the final project tasks. These tasks used `HAL_GetTick` to ensure they ran for the exact time they were initialized for, and utilized the NPP to avoid context switches.
