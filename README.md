@@ -6,6 +6,24 @@ Names: Gustavo Moro, Italo Miranda Kusmin Alves, Pedro Augusto Dantas Vargas
 
 Matriculations: 22101929, 22101930, 22103666
 
+## Project Objective
+
+The objective of this project is to implement a PID controller to maintain the height of a ping pong ball using a fan controlled by PWM. The system will utilize a VL53L0X distance sensor to measure the height of the ball and an STM32F103 microcontroller to process the sensor data and control the fan. The project aims to demonstrate the effectiveness of using an EDF scheduler to manage periodic and aperiodic tasks within a real-time operating system.
+
+The specific goals of the project are:
+
+1. To read the distance from the VL53L0X sensor at regular intervals.
+2. To calculate the appropriate fan speed using a PID controller based on the measured distance and the desired set point.
+3. To control the fan speed using PWM to maintain the ping pong ball at the desired height.
+4. To handle aperiodic tasks such as changing the set point based on external inputs using the TBS server implemented previously.
+5. To ensure that all tasks meet their deadlines using the EDF scheduling algorithm implemented previously.
+
+This project will showcase the implementation of real-time control systems and the use of scheduling algorithms to manage task execution in embedded systems following this plant:
+
+### Plant
+
+   ![Plant](./Plant.png)
+
 ## Utilized Components
 
 1. FAN Delta Electronics (Model AUB0912VH-CX09), which is activated using PWM.
