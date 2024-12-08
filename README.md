@@ -2,9 +2,9 @@
 
 ## Students Information
 
-Names: Gustavo Moro, Italo Miranda Kusmin Alves, Pedro Augusto Dantas Vargas
+Names: Gustavo Moro, Italo Miranda Kusmin Alves, Pedro Augusto Dantas Vargas.
 
-Matriculations: 22101929, 22101930, 22103666
+Matriculations: 22101929, 22101930, 22103666.
 
 ## Project Objective
 
