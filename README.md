@@ -15,14 +15,14 @@ The specific goals of the project are:
 1. To read the distance from the VL53L0X sensor at regular intervals.
 2. To calculate the appropriate fan speed using a PID controller based on the measured distance and the desired set point.
 3. To control the fan speed using PWM to maintain the ping pong ball at the desired height.
-4. To handle aperiodic tasks such as changing the set point based on external inputs using the TBS server implemented previously.
+4. To handle aperiodic tasks, such as changing the set point based on external inputs, using the TBS server implemented previously.
 5. To ensure that all tasks meet their deadlines using the EDF scheduling algorithm implemented previously.
 
 This project will showcase the implementation of real-time control systems and the use of scheduling algorithms to manage task execution in embedded systems following this plant:
 
 ### Plant
 
-   ![Plant](./Plant.png)
+![Plant](./Plant.png)
 
 ## Utilized Components
 
