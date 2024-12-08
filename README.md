@@ -107,3 +107,7 @@ Since the execution time of `CH` (10 ms) is equal to the available slack time (1
 ### Conclusion
 
 The given periodic tasks (READ, PID, and CTRL) are schedulable under the EDF algorithm as their total utilization is less than 1. The aperiodic task (CH) is also schedulable as its execution time fits within the available slack time of the periodic tasks.
+
+##References
+Giorgio C. Buttazzo. 2011. Hard Real-Time Computing Systems: Predictable Scheduling Algorithms and Applications (3rd. ed.). Springer Publishing Company, Incorporated.
+G M. M. VL53L0X C library for STM32F103. Available on: https://github.com/MarcelMG/VL53L0X-STM32F103
