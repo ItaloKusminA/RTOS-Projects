@@ -73,7 +73,7 @@ The schedulability analysis ensures that all tasks meet their deadlines, both pe
 
 ### Task Execution Times, Deadlines, and Periods
 
-| Task Name | Execution Time (ms) | Deadline (ms) | Period (ms) |
+| Task Name | Wors Case Execution Time (ms) | Deadline (ms) | Period (ms) |
 |-----------|----------------------|---------------|-------------|
 | READ      | 10                   | 50            | 50          |
 | PID       | 25                   | 50            | 50          |
