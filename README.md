@@ -3,32 +3,55 @@
 ## Students Information
 
 Names: Gustavo Moro, Italo Miranda Kusmin Alves, Pedro Augusto Dantas Vargas
-Matriculations: 22101929, 22101930, 22103666.
 
-## Utilized components
+Matriculations: 22101929, 22101930, 22103666
+
+## Utilized Components
+
+1. FAN Delta Electronics (Model AUB0912VH-CX09), which is activated using PWM.
+2. Distance sensor VL53L0X, which utilizes the I2C protocol to send the distance information.
+3. Microcontroller STM32F103.
 
 ## Periodic Tasks
 
+As periodic tasks, scheduled by the EDF Scheduler, we have:
+
+1. `TaskREAD`: This task is responsible for reading the VL53L0X sensor. The "VL53L0X-STM32F103" library from "MarcelMG" was used for communication, found in the references section. It uses B6 as SCL and B7 as SDA.
+2. `TaskPID`: This task is responsible for calculating the PID controller with given Kp, Ki, and Kd values. The proportional term is calculated by multiplying Kp by the error (difference between the distance read and the set point). The integral term is computed by integrating the error over time, multiplying the time variation between reads by the error, and then by Ki. The derivative term is calculated by finding the difference between the current error and the last error, dividing by the time variation between reads, and multiplying by Kp. The PID value, representing the duty cycle percentage, is the sum of these terms. The time variation used is equal to the task period. While the `HAL_GetTick` function was tried for accurate time variation, constant value performance was better due to the variance affecting PWM stability.
+3. `TaskCTRL`: This task sets the PWM value based on the calculated PID plus an adjustment of 61% duty cycle. It uses A0 as the PWM pin.
+
+All three tasks have a period and deadline of 50ms, aligned with the sensor read period. The utilization with this period remains well below 1, ensuring schedulability under the EDF scheduler.
+
 ## Aperiodic Tasks
 
-## Critical regions
+As an aperiodic task, scheduled with the help of the TBS Server, we have:
+
+1. `TaskCH`: This task changes the setpoint from 600 to 200, activated by an interrupt on pin B0.
+
+## Critical Regions
+
+There are four critical regions, protected by four semaphores using the Non-preemptive protocol:
+- `measuredValueSemaphore`: Protects sensor readings, shared by `TaskREAD` and `TaskPID`.
+- `setPointSemaphore`: Protects the set point, shared by `TaskPID` and `TaskCH`.
+- `pidValueSemaphore`: Protects the PID value, shared by `TaskPID` and `TaskCTRL`.
 
 ## Schedulability Analysis
 
-The schedulability analysis ensures that all tasks meet their deadlines, both periodic and aperiodic. The computation time was measured in the second project. Then, a significant safety margin was incorporated into the execution times to guarantee that tasks complete within their deadlines even under varying load conditions. This is crucial because the computation time of each task is needed by the TBS to calculate the deadlines.
+The schedulability analysis ensures that all tasks meet their deadlines, both periodic and aperiodic. The computation times were measured in the second project, with significant safety margins incorporated to guarantee task completion within deadlines even under varying load conditions. This is crucial because the computation time of each task is needed by the TBS to calculate deadlines.
 
 ### Task Execution Times, Deadlines, and Periods
 
 | Task Name | Execution Time (ms) | Deadline (ms) | Period (ms) |
 |-----------|----------------------|---------------|-------------|
-| SENS      | 50                   | 200           | 200         |
-| CTRL      | 100                  | 500           | 500         |
+| READ      | 10                   | 50            | 50          |
+| PID       | 25                   | 50            | 50          |
+| CTRL      | 5                    | 50            | 50          |
 
 ### Aperiodic Tasks
 
 | Task Name | Execution Time (ms) | Deadline (ms) |
 |-----------|----------------------|---------------|
-| DIAG      | 30                   | -             |
+| CH        | 10                   | -             |
 
 ### Utilization Calculation
 
@@ -40,30 +63,33 @@ where:
 - $C_i$ is the execution time of the task.
 - $T_i$ is the period of the task.
 
-#### Task SENS
-$$ U_{SENS} = \frac{50 \, \text{ms}}{200 \, \text{ms}} = 0.25 $$
+#### Task READ
+$$ U_{READ} = \frac{10 \, \text{ms}}{50 \, \text{ms}} = 0.2 $$
+
+#### Task PID
+$$ U_{PID} = \frac{25 \, \text{ms}}{50 \, \text{ms}} = 0.5 $$
 
 #### Task CTRL
-$$ U_{CTRL} = \frac{100 \, \text{ms}}{500 \, \text{ms}} = 0.20 $$
+$$ U_{CTRL} = \frac{5 \, \text{ms}}{50 \, \text{ms}} = 0.1 $$
 
 ### Total Utilization for Periodic Tasks
-$$ U_{total} = U_{SENS} + U_{CTRL} = 0.25 + 0.20 = 0.45 $$
+$$ U_{total} = U_{READ} + U_{PID} + U_{CTRL} = 0.2 + 0.5 + 0.1 = 0.8 $$
 
-Since the total utilization for periodic tasks is 0.45, which is less than 1, these periodic tasks are schedulable under the EDF algorithm.
+Since the total utilization for periodic tasks is 0.8, which is less than 1, these periodic tasks are schedulable under the EDF algorithm.
 
-### Schedulability of Aperiodic Task 
+### Schedulability of Aperiodic Task
 
-For aperiodic tasks, schedulability depends on the available slack time in the schedule of periodic tasks. The task `DIAG` has an execution time of 30 ms. Since the utilization of the periodic tasks is 0.45, there is remaining utilization available for aperiodic tasks:
+For aperiodic tasks, schedulability depends on the available slack time in the schedule of periodic tasks. The task `CH` has an execution time of 10 ms. Since the utilization of the periodic tasks is 0.8, there is remaining utilization available for aperiodic tasks:
 
-$$ U_{remaining} = 1 - U_{total} = 1 - 0.45 = 0.55 $$
+$$ U_{remaining} = 1 - U_{total} = 1 - 0.8 = 0.2 $$
 
-To determine if `DIAG` can be scheduled, we need to ensure that it can fit within the available slack time. Given that it does not have a specified period and is event-driven (triggered by an interrupt on PB0), we check if the system can accommodate its execution time within the slack.
+To determine if `CH` can be scheduled, we need to ensure that it can fit within the available slack time. Given that it does not have a specified period and is event-driven (triggered by an interrupt on B0), we check if the system can accommodate its execution time within the slack.
 
-- Execution Time of DIAG: 30 ms
-- Total available time in a 200 ms period (least common multiple of periods of periodic tasks): $200 \times 0.55 = 110 \ \text{ms}$
+- Execution Time of CH: 10 ms
+- Total available time in a 50 ms period: $50 \times 0.2 = 10 \, \text{ms}$
 
-Since the execution time of `DIAG` (30 ms) is less than the available slack time (110 ms) in a 200 ms window, `DIAG` is schedulable within the system.
+Since the execution time of `CH` (10 ms) is equal to the available slack time (10 ms) in a 50 ms window, `CH` is schedulable within the system.
 
 ### Conclusion
 
-The given periodic tasks (SENS and CTRL) are schedulable under the EDF algorithm as their total utilization is less than 1. The aperiodic task (DIAG) is also schedulable as its execution time fits within the available slack time of the periodic tasks.
+The given periodic tasks (READ, PID, and CTRL) are schedulable under the EDF algorithm as their total utilization is less than 1. The aperiodic task (CH) is also schedulable as its execution time fits within the available slack time of the periodic tasks.
