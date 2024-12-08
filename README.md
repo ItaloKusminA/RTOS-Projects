@@ -47,7 +47,7 @@ In an attempt to implement an Event Viewer using a Logic Analyzer and Pulse View
 
    ![EventViewer](./EventViewer.png)
 
-In the figure above, A0 represents the periodic Task A (5ms execution time, 50ms deadline, and 50ms period), A1 represents the periodic Task B, A2 represents the periodic Task C (5ms execution time, 50ms deadline, and 50ms period), A3 represents the aperiodic Task D (10ms execution time), and A4 represents the Idle Thread.
+In the figure above, D0 represents the periodic Task A (5ms execution time, 50ms deadline, and 50ms period), D1 represents the periodic Task B, D2 represents the periodic Task C (5ms execution time, 50ms deadline, and 50ms period), D3 represents the aperiodic Task D (10ms execution time), and D4 represents the Idle Thread.
 
 ## Schedulability Analysis
 
