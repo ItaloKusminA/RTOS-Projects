@@ -34,12 +34,20 @@ There are four critical regions, protected by four semaphores using the Non-pree
 - `measuredValueSemaphore`: Protects sensor readings, shared by `TaskREAD` and `TaskPID`.
 - `setPointSemaphore`: Protects the set point, shared by `TaskPID` and `TaskCH`.
 - `pidValueSemaphore`: Protects the PID value, shared by `TaskPID` and `TaskCTRL`.
+- 
+### Scheduler Corrections
 
-##Scheduler corrections
+In an attempt to implement an Event Viewer using a Logic Analyzer and Pulse View, some errors were found in the scheduler logic, specifically in the `OS_waitNextOccurrence` and `OS_waitNextPeriod` functions. These errors were affecting the correct functioning of the scheduler, particularly when aperiodic tasks arrived at the server. These functions were not checking if more aperiodic tasks were available on the server. After applying the corrections, it was possible to validate the scheduler by using three generic periodic tasks and one aperiodic task with the same parameters as the final project tasks. These tasks used `HAL_GetTick` to ensure they ran for the exact time they were initialized for, and utilized the NPP to avoid context switches.
 
-On the attemption of implement a Event Viewer, utilizing a Logic Analyser and the Pulse View, it was possible to find some error on the scheduler logic, found on the `OS_waitNextOccurence` and `OS_waitNextPeriod`, which were affecting the correct working of the scheduler, principally when aperiodic tasks arrived on the server, theses functions were not verifying if there was more aperiodic tasks available on the server. Applying the corrections it was possible to validate the scheduler, by using three generic tasks, which keeps utilizes the `HAL_GetTick` to keep the tasks running for the exact time it were initializated for and utilizing the NPP to avoid the context change.
+### Logic Analyzer
 
+   ![Logic Analyzer](./LogicAnalyzer.png)
 
+### Tasks Execution Viewer
+
+   ![EventViewer](./EventViewer.png)
+
+In the figure above, A0 represents the periodic Task A (5ms execution time, 50ms deadline, and 50ms period), A1 represents the periodic Task B, A2 represents the periodic Task C (5ms execution time, 50ms deadline, and 50ms period), A3 represents the aperiodic Task D (10ms execution time), and A4 represents the Idle Thread.
 
 ## Schedulability Analysis
 
