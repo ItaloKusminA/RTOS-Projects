@@ -67,7 +67,7 @@ In an attempt to implement an Event Viewer using a Logic Analyzer and Pulse View
 
 In the figure above, D0 represents the periodic Task A (5ms execution time, 50ms deadline, and 50ms period), D1 represents the periodic Task B, D2 represents the periodic Task C (5ms execution time, 50ms deadline, and 50ms period), D3 represents the aperiodic Task D (10ms execution time), and D4 represents the Idle Thread.
 
-The code used with the logic analyzer can be found here: [TasksViewer.c]("TasksViewer.c")
+The code used with the logic analyzer can be found here: [Src/TasksViewer.c](./Src/TasksViewer.c)
 
 ## Schedulability Analysis
 
