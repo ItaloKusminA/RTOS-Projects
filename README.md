@@ -1,53 +1,91 @@
-# Total Bandwidth Server and Non-Preemptive Protocol Implementation on MirOS
+# PID Controller for the Height of a Ping Pong Ball on MiROS
 
-## Student Information
+## Students Information
 
-Name: Italo Miranda Kusmin Alves  
-Matriculation: 22101930
+Names: Gustavo Moro, Italo Miranda Kusmin Alves, Pedro Augusto Dantas Vargas.
 
-## Total Bandwidth Server Implementation
+Matriculations: 22101929, 22101930, 22103666.
 
-To implement the Total Bandwidth Server (TBS), the first change was to modify the `OSThread` structure by adding two additional parameters: `aperiodicParameters` for aperiodic tasks, which store the computation time of each task, and `periodicParameters`, which store the relative deadline and relative period. The period and deadline are dynamically adjusted to select the task with the earliest deadline.
+## Project Objective
 
-A new vector of structs, `OS_APThread`, was created to store the started aperiodic tasks. Additionally, `OS_APreadyIndex` was introduced to keep track of the aperiodic tasks that are ready to run.
+The objective of this project is to implement a PID controller to maintain the height of a ping pong ball using a fan controlled by PWM. The system will utilize a VL53L0X distance sensor to measure the height of the ball and an STM32F103 microcontroller to process the sensor data and control the fan. The project aims to demonstrate the effectiveness of using an EDF scheduler to manage periodic and aperiodic tasks within a real-time operating system.
 
-Next, the `OSAperiodic_thread_start` function was implemented. Its purpose is similar to `OSThread_start`, but with a key difference: aperiodic tasks start with the ready index set to 0 (not ready to run). This function initializes the `aperiodicParameters` structure with the received computation time and sets the deadline to `UINT32_MAX`. In contrast, `OSThread_start` initializes the `periodicParameters` with the user-provided parameters.
+The specific goals of the project are:
 
-The TBS implementation is achieved using the `OS_TBS` function, which applies the TBS algorithm to set task deadlines and update the ready index to 1 (ready to run). The deadline is calculated as follows:
+1. To read the distance from the VL53L0X sensor at regular intervals.
+2. To calculate the appropriate fan speed using a PID controller based on the measured distance and the desired set point.
+3. To control the fan speed using PWM to maintain the ping pong ball at the desired height.
+4. To handle aperiodic tasks, such as changing the set point based on external inputs, using the TBS server implemented previously.
+5. To ensure that all tasks meet their deadlines using the EDF scheduling algorithm implemented previously.
 
-$$
-D_i = \max(t_{current}, D_{last}) + \frac{C_i}{U_s}
-$$
+This project will showcase the implementation of real-time control systems and the use of scheduling algorithms to manage task execution in embedded systems following this plant:
 
-where  $D_i$ is the deadline, $t_{current}$ is the current time, $D_{last}$ is the last deadline, $C_i$ is the computation time, and $U_s$ is the server utilization. Essentially, the deadline assigned to the task is the sum of the current time (or the last deadline, whichever is greater) and the ratio of the task's computation time to the server utilization. The Earliest Deadline Scheduler then schedules the aperiodic task if its deadline is earlier than those of the periodic tasks. `OS_EarliestPeriodicDeadline` and `OS_EarliestAperiodicDeadline` were created to calculate and return the earliest periodic and aperiodic tasks, respectively. They are called in `OS_tick`, and the aperiodic task's earliest deadline is checked only when the server is active. This means that if the server has at least one task ready to run, it is identified by the function `OS_AperiodicTaskAvailable`.
+### Plant
 
-Finally, the `OS_waitNextOccurence` function was implemented, functioning similarly to `OS_waitNextPeriod`. It handles the end of a task's execution by resetting the deadline to `UINT32_MAX` and the ready index to 0 (not ready to run). When they are called, these functions calculate the next earliest deadline task and then call `OS_sched`.
+![Plant](./Plant.png)
 
+## Utilized Components
 
-## Aperiodic Task Implementation
+1. FAN Delta Electronics (Model AUB0912VH-CX09), which is activated using PWM.
+2. Distance sensor VL53L0X, which utilizes the I2C protocol to send the distance information.
+3. Microcontroller STM32F103.
 
-An aperiodic task was implemented with the function `TaskDiagnostics`. It is activated when the PB0 pin receives an interruption, triggering the callback `HAL_GPIO_EXTI_Callback`, which then calls `OS_TBS`. In this process, the task is set to active and is scheduled when it has the earliest deadline, just like a normal task.
+## Periodic Tasks
 
-## Non-Preemptive Protocol Implementation
+As periodic tasks, scheduled by the EDF Scheduler, we have:
 
-The non-preemptive protocol was implemented by adding a parameter `NPPprio` to the `OS_thread` structure. This parameter is set to the maximum value when a thread enters a critical region, preventing other threads from being scheduled. The thread keeps track of the critical regions it enters, ensuring that `NPPprio` is reset only when it exits the last critical region.
+1. `TaskREAD`: This task is responsible for reading the VL53L0X sensor. The "VL53L0X-STM32F103" library from "MarcelMG" was used for communication, found in the references section. It uses B6 as SCL and B7 as SDA.
+2. `TaskPID`: This task is responsible for calculating the PID controller with given Kp, Ki, and Kd values. The proportional term is calculated by multiplying Kp by the error (difference between the distance read and the set point). The integral term is computed by integrating the error over time, multiplying the time variation between reads by the error, and then by Ki. The derivative term is calculated by finding the difference between the current error and the last error, dividing by the time variation between reads, and multiplying by Kp. The PID value, representing the duty cycle percentage, is the sum of these terms. The time variation used is equal to the task period. While the `HAL_GetTick` function was tried for accurate time variation, constant value performance was better due to the variance affecting PWM stability.
+3. `TaskCTRL`: This task sets the PWM value based on the calculated PID plus an adjustment of 61% duty cycle. It uses A0 as the PWM pin.
+
+All three tasks have a period and deadline of 50ms, aligned with the sensor read period. The utilization with this period remains well below 1, ensuring schedulability under the EDF scheduler.
+
+## Aperiodic Tasks
+
+As an aperiodic task, scheduled with the help of the TBS Server, we have:
+
+1. `TaskCH`: This task changes the setpoint from 600 to 200, activated by an interrupt on pin B0.
+
+## Critical Regions
+
+There are four critical regions, protected by four semaphores using the Non-preemptive protocol:
+- `measuredValueSemaphore`: Protects sensor readings, shared by `TaskREAD` and `TaskPID`.
+- `setPointSemaphore`: Protects the set point, shared by `TaskPID` and `TaskCH`.
+- `pidValueSemaphore`: Protects the PID value, shared by `TaskPID` and `TaskCTRL`.
+  
+### Scheduler Corrections
+
+In an attempt to implement an Event Viewer using a Logic Analyzer and Pulse View, some errors were found in the scheduler logic, specifically in the `OS_waitNextOccurrence` and `OS_waitNextPeriod` functions. These errors were affecting the correct functioning of the scheduler, particularly when aperiodic tasks arrived at the server. These functions were not checking if more aperiodic tasks were available on the server. After applying the corrections, it was possible to validate the scheduler by using three generic periodic tasks and one aperiodic task with the same parameters as the final project tasks. These tasks used `HAL_GetTick` to ensure they ran for the exact time they were initialized for, and utilized the NPP to avoid context switches.
+
+### Logic Analyzer
+
+   ![Logic Analyzer](./LogicAnalyzer.png)
+
+### Tasks Execution Viewer
+
+   ![EventViewer](./EventViewer.png)
+
+In the figure above, D0 represents the periodic Task A (5ms execution time, 50ms deadline, and 50ms period), D1 represents the periodic Task B, D2 represents the periodic Task C (5ms execution time, 50ms deadline, and 50ms period), D3 represents the aperiodic Task D (10ms execution time), and D4 represents the Idle Thread.
+
+The code used with the logic analyzer can be found here: [Src/TasksViewer.c](./Src/TasksViewer.c)
 
 ## Schedulability Analysis
 
-The schedulability analysis ensures that all tasks meet their deadlines, both periodic and aperiodic. The computation time was measured in the second project. Then, a significant safety margin was incorporated into the execution times to guarantee that tasks complete within their deadlines even under varying load conditions. This is crucial because the computation time of each task is needed by the TBS to calculate the deadlines.
+The schedulability analysis ensures that all tasks meet their deadlines, both periodic and aperiodic. The computation times were measured in the second project, with significant safety margins incorporated to guarantee task completion within deadlines even under varying load conditions. This is crucial because the computation time of each task is needed by the TBS to calculate deadlines.
 
 ### Task Execution Times, Deadlines, and Periods
 
-| Task Name | Execution Time (ms) | Deadline (ms) | Period (ms) |
+| Task Name | Wors Case Execution Time (ms) | Deadline (ms) | Period (ms) |
 |-----------|----------------------|---------------|-------------|
-| SENS      | 50                   | 200           | 200         |
-| CTRL      | 100                  | 500           | 500         |
+| READ      | 10                   | 50            | 50          |
+| PID       | 25                   | 50            | 50          |
+| CTRL      | 5                    | 50            | 50          |
 
 ### Aperiodic Tasks
 
-| Task Name | Execution Time (ms) | Deadline (ms) |
+| Task Name | Worst Case Execution Time (ms) | Deadline (ms) |
 |-----------|----------------------|---------------|
-| DIAG      | 30                   | -             |
+| CH        | 10                   | -             |
 
 ### Utilization Calculation
 
@@ -59,58 +97,38 @@ where:
 - $C_i$ is the execution time of the task.
 - $T_i$ is the period of the task.
 
-#### Task SENS
-$$ U_{SENS} = \frac{50 \, \text{ms}}{200 \, \text{ms}} = 0.25 $$
+#### Task READ
+$$ U_{READ} = \frac{10 \, \text{ms}}{50 \, \text{ms}} = 0.2 $$
+
+#### Task PID
+$$ U_{PID} = \frac{25 \, \text{ms}}{50 \, \text{ms}} = 0.5 $$
 
 #### Task CTRL
-$$ U_{CTRL} = \frac{100 \, \text{ms}}{500 \, \text{ms}} = 0.20 $$
+$$ U_{CTRL} = \frac{5 \, \text{ms}}{50 \, \text{ms}} = 0.1 $$
 
 ### Total Utilization for Periodic Tasks
-$$ U_{total} = U_{SENS} + U_{CTRL} = 0.25 + 0.20 = 0.45 $$
+$$ U_{total} = U_{READ} + U_{PID} + U_{CTRL} = 0.2 + 0.5 + 0.1 = 0.8 $$
 
-Since the total utilization for periodic tasks is 0.45, which is less than 1, these periodic tasks are schedulable under the EDF algorithm.
+Since the total utilization for periodic tasks is 0.8, which is less than 1, these periodic tasks are schedulable under the EDF algorithm.
 
-### Schedulability of Aperiodic Task 
+### Schedulability of Aperiodic Task
 
-For aperiodic tasks, schedulability depends on the available slack time in the schedule of periodic tasks. The task `DIAG` has an execution time of 30 ms. Since the utilization of the periodic tasks is 0.45, there is remaining utilization available for aperiodic tasks:
+For aperiodic tasks, schedulability depends on the available slack time in the schedule of periodic tasks. The task `CH` has an execution time of 10 ms. Since the utilization of the periodic tasks is 0.8, there is remaining utilization available for aperiodic tasks:
 
-$$ U_{remaining} = 1 - U_{total} = 1 - 0.45 = 0.55 $$
+$$ U_{remaining} = 1 - U_{total} = 1 - 0.8 = 0.2 $$
 
-To determine if `DIAG` can be scheduled, we need to ensure that it can fit within the available slack time. Given that it does not have a specified period and is event-driven (triggered by an interrupt on PB0), we check if the system can accommodate its execution time within the slack.
+To determine if `CH` can be scheduled, we need to ensure that it can fit within the available slack time. Given that it does not have a specified period and is event-driven (triggered by an interrupt on B0), we check if the system can accommodate its execution time within the slack.
 
-- Execution Time of DIAG: 30 ms
-- Total available time in a 200 ms period (least common multiple of periods of periodic tasks): $200 \times 0.55 = 110 \ \text{ms}$
+- Execution Time of CH: 10 ms
+- Total available time in a 50 ms period: $50 \times 0.2 = 10 \, \text{ms}$
 
-Since the execution time of `DIAG` (30 ms) is less than the available slack time (110 ms) in a 200 ms window, `DIAG` is schedulable within the system.
+Since the execution time of `CH` (10 ms) is equal to the available slack time (10 ms) in a 50 ms window, `CH` is schedulable within the system.
 
 ### Conclusion
 
-The given periodic tasks (SENS and CTRL) are schedulable under the EDF algorithm as their total utilization is less than 1. The aperiodic task (DIAG) is also schedulable as its execution time fits within the available slack time of the periodic tasks.
+The given periodic tasks (READ, PID, and CTRL) are schedulable under the EDF algorithm as their total utilization is less than 1. The aperiodic task (CH) is also schedulable as its execution time fits within the available slack time of the periodic tasks.
 
-## Problems Solved with the STM32 BluePill
+## References
 
-Many of the STM32f1 series (Bluepill) have problems being recognized during the first use with the ST-LINK V2. To solve these problems, it was observed that using the STLink Utility, which can be found at this link: [STLink Utility](https://www.st.com/en/development-tools/stsw-link004.html), it is possible to resolve the issue by following these steps:
-
-1. Change both jumpers of the boot to the "1" position, accessing the RAM memory of the STM32.
-   
-   ### Boot Example
-   ![Boot example](./BOOTSTM.png)
-
-2. Connect to the target using the STLink Utility.
-   
-   ### Connect to Target
-   ![Connect to target](./Connect.png)
-
-3. Perform a full chip erase.
-   
-   ### Full Chip Erase
-   ![Full chip erase](./Erase.png)
-
-4. Finally, change the boot jumpers back to the "0" position and try to run your project again.
-
-If you encounter problems debugging your project, it can be resolved in two ways:
-- If your project doesn't have an `.ioc` file, you must uninstall and reinstall the STM32CubeIDE.
-- If your project has an `.ioc` file, go to "Pinout & Configuration," then "System Core," and change the "Debug" option to "Serial Wire."
-
-  ### System Core
-   ![SystemCore](./SystemCore.png)
+Giorgio C. Buttazzo. 2011. Hard Real-Time Computing Systems: Predictable Scheduling Algorithms and Applications (3rd. ed.). Springer Publishing Company, Incorporated.
+G M. M. VL53L0X C library for STM32F103. Available on: https://github.com/MarcelMG/VL53L0X-STM32F103

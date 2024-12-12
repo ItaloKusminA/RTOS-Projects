@@ -62,6 +62,7 @@ aperiodicParameters ITAP;
 
 void main_idleThread() {
     while (1) {
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
         OS_onIdle();
     }
 }
@@ -137,10 +138,10 @@ uint32_t OS_EarliestAperiodicDeadline(void){
 					earliest_deadline_index = i;
 				}
 			}
-			if(OS_PThread[i]->NPPprio == UINT32_MAX){
+			if(OS_APThread[i]->NPPprio == UINT32_MAX){
 				return i;
 			}
-			if(OS_APThread[i]->AP->deadline != 0){
+			if(OS_APThread[i]->AP->deadline == 0){
 				OS_APreadyIndex[OS_APThread[i]->index] = 0;
 			}
 		}
@@ -178,7 +179,7 @@ void OS_tick(void) {
             if(OS_APThread[APi]->NPPprio == UINT32_MAX) next = OS_APThread[APi];
         } else {
             next = OS_APThread[APi];
-            if(OS_PThread[Pi]->NPPprio == UINT32_MAX) next = OS_PThread[APi];
+            if(OS_PThread[Pi]->NPPprio == UINT32_MAX) next = OS_PThread[Pi];
         }
     } else {
         next = OS_PThread[Pi];
@@ -194,8 +195,10 @@ void OS_tick(void) {
                     OS_PThread[i]->PP->period = OS_PThread[i]->PP->RELperiod;
                 }
             }
-            OS_PThread[i]->PP->period--;
-            OS_PThread[i]->PP->deadline--;
+            else{
+            	OS_PThread[i]->PP->period--;
+            	OS_PThread[i]->PP->deadline--;
+            }
         }
     }
 
@@ -203,16 +206,13 @@ void OS_tick(void) {
         for (int i = 0; i < OS_APindex; i++) {
             if (OS_APThread[i]) {
                 if (OS_APreadyIndex[i] == 0) {
-                    OS_APThread[i]->timeout--;
-                    if (OS_APThread[i]->timeout == 0) {
-                        OS_APreadyIndex[i] = 1;
-                    }
                 }
-                if (OS_APThread[i]->AP->deadline != 0) {
-                    OS_APThread[i]->AP->deadline--;
+                else{
+					OS_APThread[i]->AP->deadline--;
+					if(OS_APThread[i]->AP->deadline == 0)OS_APreadyIndex[i] = 0;
                 }
             }
-        }
+         }
     }
 }
 
@@ -260,35 +260,37 @@ void OS_TBS(OSThread *occurenceTask){
 }
 
 void OS_waitNextOccurence(void){
+	__disable_irq();
 	OS_APreadyIndex[OS_curr->index] = 0;
 	OS_APThread[OS_curr->index]->AP->deadline = UINT32_MAX;
 	if(OS_AperiodicTaskAvailable()){
 		next = OS_APThread[OS_EarliestAperiodicDeadline()];
 		if (OS_PThread[OS_EarliestPeriodicDeadline()]->PP->deadline < next->AP->deadline){
 			next = OS_PThread[OS_EarliestPeriodicDeadline()];
+			if(OS_APThread[OS_EarliestAperiodicDeadline()]->NPPprio == UINT32_MAX)next = OS_APThread[OS_EarliestAperiodicDeadline()];
 		}
 	}
 	else{
 		next = OS_PThread[OS_EarliestPeriodicDeadline()];
 	}
-    __disable_irq();
     OS_sched();
     __enable_irq();
 }
 
 void OS_waitNextPeriod(void){
+	__disable_irq();
 	OS_PreadyIndex[OS_curr->index] = 0;
 	OS_curr->timeout = OS_curr->PP->period;
 	if(OS_AperiodicTaskAvailable()){
 		next = OS_APThread[OS_EarliestAperiodicDeadline()];
 		if (OS_PThread[OS_EarliestPeriodicDeadline()]->PP->deadline < next->AP->deadline){
 			next = OS_PThread[OS_EarliestPeriodicDeadline()];
+			if(OS_APThread[OS_EarliestAperiodicDeadline()]->NPPprio == UINT32_MAX)next = OS_APThread[OS_EarliestAperiodicDeadline()];
 		}
 	}
 	else{
 		next = OS_PThread[OS_EarliestPeriodicDeadline()];
 	}
-    __disable_irq();
     OS_sched();
     __enable_irq();
 }
