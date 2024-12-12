@@ -1,4 +1,7 @@
 # Projects developed during the RTOS Discipline
+
+On the branches, you can find the implementation of the following projects:
+
 ## Project 1
 Producer and consumer implementation using semaphores
 ## Project 2
